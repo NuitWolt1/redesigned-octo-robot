@@ -5,12 +5,12 @@ import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
 type GiftInput = {
   id: string; collection: string; number: number; model: string; modelRarity: string;
   backdrop: string; backdropRarity: string; symbol: string; symbolRarity: string;
-  image: string; source: string; serial: string;
+  image: string; source: string; serial: string; price?: unknown;
 };
 type GiftRow = {
   id: string; collection: string; gift_number: number; model: string; model_rarity: string;
   backdrop: string; backdrop_rarity: string; symbol: string; symbol_rarity: string;
-  image: string; source: string; serial: string; created_at: string;
+  image: string; source: string; serial: string; created_at: string; price_rub?: number | string | null;
 };
 
 function safeText(value: unknown, max: number): string {
@@ -24,7 +24,8 @@ function fromRow(row: GiftRow) {
     id: row.id, collection: row.collection, number: row.gift_number, model: row.model,
     modelRarity: row.model_rarity, backdrop: row.backdrop, backdropRarity: row.backdrop_rarity,
     symbol: row.symbol, symbolRarity: row.symbol_rarity, image: row.image, source: row.source,
-    serial: row.serial, createdAt: row.created_at
+    serial: row.serial, createdAt: row.created_at,
+    price: row.price_rub === null || row.price_rub === undefined ? null : Number(row.price_rub)
   };
 }
 
@@ -60,6 +61,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true });
     }
 
+    if (action === 'set_price') {
+      const id = safeText(body.id, 100);
+      if (!/^[a-zA-Z0-9_-]+$/.test(id)) return res.status(400).json({ error: 'Invalid gift ID.' });
+      const empty = body.price === null || body.price === undefined || body.price === '';
+      const price = empty ? null : Math.round(Number(body.price) * 100) / 100;
+      if (price !== null && (!Number.isFinite(price) || price <= 0 || price > 1e9)) return res.status(400).json({ error: 'Invalid price.' });
+      const rows = await databaseRequest<GiftRow[]>('market_gifts', new URLSearchParams({ id: `eq.${id}`, select: '*' }), 'PATCH', { price_rub: price });
+      if (!rows.length) return res.status(404).json({ error: 'Gift not found.' });
+      return res.status(200).json({ item: fromRow(rows[0]) });
+    }
+
     const normalizeGift = (input: unknown) => {
       const gift = input as Partial<GiftInput> | undefined;
       if (!gift) throw new Error('Invalid gift details.');
@@ -74,7 +86,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!/^[a-zA-Z0-9_-]+$/.test(id) || !collection || !model || !backdrop || !symbol || !Number.isSafeInteger(number) || number < 1 || !validHttpUrl(image) || !validHttpUrl(source)) {
         throw new Error('Invalid gift details.');
       }
+      const rawPrice = gift.price;
+      const price = rawPrice === null || rawPrice === undefined || rawPrice === '' ? undefined : Math.round(Number(rawPrice) * 100) / 100;
+      if (price !== undefined && (!Number.isFinite(price) || price <= 0 || price > 1e9)) throw new Error('Invalid gift details.');
       return {
+        ...(price !== undefined ? { price_rub: price } : {}),
         id, collection, gift_number: number, model, model_rarity: safeText(gift.modelRarity, 30) || '—',
         backdrop, backdrop_rarity: safeText(gift.backdropRarity, 30) || '—', symbol,
         symbol_rarity: safeText(gift.symbolRarity, 30) || '—', image, source,

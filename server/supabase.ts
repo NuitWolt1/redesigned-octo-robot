@@ -14,7 +14,7 @@ function getConfig() {
 export async function databaseRequest<T>(
   table: 'market_gifts' | 'reviews' | 'user_stats',
   query: URLSearchParams,
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   payload?: unknown,
   prefer = 'return=representation'
 ): Promise<T> {

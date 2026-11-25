@@ -40,6 +40,7 @@ type GiftItem = {
   image: string;
   source: string;
   serial: string;
+  price?: number | null;
 };
 
 declare global {
@@ -62,6 +63,7 @@ const STORAGE_KEY = 'playerok.catalog.v3';
 const THEME_KEY = 'playerok.theme.v2';
 const REVIEWS_STORAGE_KEY = 'playerok.reviews.v1';
 const botUrl = 'https://t.me/Playerok_Guarantor_Bot';
+const managerUrl = 'https://t.me/Mananger_Playerok';
 
 // Коллекционные подарки Telegram. Все изображения ведут на публичные NFT-превью Fragment.
 const nav: { id: Exclude<Tab, 'admin'>; label: string; ru: string; icon: typeof Gamepad2 }[] = [
@@ -174,6 +176,9 @@ function parseGiftLink(value: string): { collection: string; number: string; slu
   }
 }
 
+type GiftLookup = { serial: string; ok: boolean; error?: string; collection?: string; model?: string; modelRarity?: string; backdrop?: string; backdropRarity?: string; symbol?: string; symbolRarity?: string };
+const lookupGifts = (serials: string[]) => adminPost<{ results: GiftLookup[] }>('/api/gift-lookup', { serials }).then(r => r.results);
+
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(path, { method: 'GET', cache: 'no-store' });
   const data = await response.json().catch(() => ({}));
@@ -219,13 +224,19 @@ function App() {
   const [databaseError, setDatabaseError] = useState('');
   const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   const [reviewForm, setReviewForm] = useState({ username: '', rating: 5, text: '', date: nowLocal() });
+  const [batchText, setBatchText] = useState('');
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchPrice, setBatchPrice] = useState('');
+  const [priceEdits, setPriceEdits] = useState<Record<string, string>>({});
+  const [buyGift, setBuyGift] = useState<GiftItem | null>(null);
+  const [batchReport, setBatchReport] = useState('');
   const [wdMethod, setWdMethod] = useState<'card' | 'phone'>('card');
   const [stats, setStats] = useState({ balance: 0, spent: 0, purchases: 0 });
   const [statsForm, setStatsForm] = useState({ telegramId: '', mode: 'add', balance: '', spent: '', purchases: '' });
   const [toast, setToast] = useState('');
   const [giftForm, setGiftForm] = useState({
     collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '',
-    symbol: '', symbolRarity: '', image: '', source: ''
+    symbol: '', symbolRarity: '', image: '', source: '', price: ''
   });
   const t = copy[lang];
 
@@ -324,6 +335,51 @@ function App() {
   const updateGiftSource = (value: string) => {
     const parsed = parseGiftLink(value);
     setGiftForm(old => parsed ? ({ ...old, source: parsed.source, collection: parsed.collection, number: parsed.number, image: parsed.image }) : ({ ...old, source: value }));
+    if (parsed && isAdmin) {
+      lookupGifts([`${parsed.source.split('/nft/')[1]}`]).then(([r]) => {
+        if (r?.ok) setGiftForm(old => old.source !== parsed.source ? old : ({ ...old, collection: r.collection || old.collection, model: r.model || '', modelRarity: r.modelRarity || '', backdrop: r.backdrop || '', backdropRarity: r.backdropRarity || '', symbol: r.symbol || '', symbolRarity: r.symbolRarity || '' }));
+      }).catch(() => {});
+    }
+  };
+  const addBatch = async () => {
+    if (!isAdmin) { showToast(t.adminDenied); return; }
+    const found = [...new Set((batchText.match(/(?:https?:\/\/)?t\.me\/nft\/[A-Za-z0-9_-]+-\d+/gi) || []).map(l => l.split('/nft/')[1]))];
+    if (!found.length) { setBatchReport(lang === 'RU' ? 'Ссылки на подарки не найдены.' : 'No gift links found.'); return; }
+    const chunk = found.slice(0, 25), rest = found.slice(25);
+    setBatchBusy(true); setBatchReport('');
+    try {
+      const results = await lookupGifts(chunk);
+      const good = results.filter(r => r.ok);
+      const items = good.map(r => {
+        const m = r.serial.match(/^(.*)-(\d+)$/)!;
+        const slug = m[1].toLowerCase().replace(/[^a-z0-9]/g, '');
+        return { id: r.serial.toLowerCase().replace(/[^a-z0-9_-]/g, ''), collection: r.collection || titleFromGiftSlug(m[1]), number: Number(m[2]), model: r.model, modelRarity: r.modelRarity, backdrop: r.backdrop, backdropRarity: r.backdropRarity, symbol: r.symbol, symbolRarity: r.symbolRarity, image: `https://nft.fragment.com/gift/${slug}-${m[2]}.webp`, source: `https://t.me/nft/${r.serial}`, serial: r.serial, price: batchPrice.trim() ? Number(batchPrice) : undefined };
+      });
+      if (items.length) {
+        await adminPost('/api/catalog', { action: 'import', items });
+        const fresh = await apiGet<{ items: GiftItem[] }>('/api/catalog');
+        setCatalog(Array.isArray(fresh.items) ? fresh.items : []);
+      }
+      const bad = results.filter(r => !r.ok);
+      setBatchReport((lang === 'RU' ? `Добавлено: ${items.length}. Не удалось: ${bad.length}.` : `Added: ${items.length}. Failed: ${bad.length}.`) + (bad.length ? '\n' + bad.map(b => `${b.serial} — ${b.error}`).join('\n') : '') + (rest.length ? (lang === 'RU' ? `\nОсталось в списке: ${rest.length} (нажмите ещё раз).` : `\nRemaining: ${rest.length} (press again).`) : ''));
+      setBatchText([...bad.map(b => `https://t.me/nft/${b.serial}`), ...rest.map(r => `https://t.me/nft/${r}`)].join('\n'));
+      showToast(`${t.added}: ${items.length}`);
+    } catch (error) { setBatchReport(error instanceof Error ? error.message : 'Error'); }
+    setBatchBusy(false);
+  };
+  const savePrice = async (id: string) => {
+    if (!isAdmin) { showToast(t.adminDenied); return; }
+    try {
+      const result = await adminPost<{ item: GiftItem }>('/api/catalog', { action: 'set_price', id, price: (priceEdits[id] ?? '').trim() });
+      setCatalog(old => old.map(g => g.id === id ? { ...g, price: result.item.price ?? null } : g));
+      setPriceEdits(old => { const next = { ...old }; delete next[id]; return next; });
+      showToast(lang === 'RU' ? 'Цена сохранена' : 'Price saved');
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
+  };
+  const buyNow = (g: GiftItem) => {
+    if (g.price == null) return;
+    if (stats.balance < g.price) { setBuyGift(g); return; }
+    showToast(lang === 'RU' ? 'Покупка пока недоступна' : 'Purchase is not available yet');
   };
   const addGift = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -349,12 +405,12 @@ function App() {
       model: giftForm.model.trim(), modelRarity: giftForm.modelRarity.trim() || '—',
       backdrop: giftForm.backdrop.trim(), backdropRarity: giftForm.backdropRarity.trim() || '—',
       symbol: giftForm.symbol.trim(), symbolRarity: giftForm.symbolRarity.trim() || '—',
-      image: imageUrl.href, source: source || `https://t.me/nft/${serial}`, serial
+      image: imageUrl.href, source: source || `https://t.me/nft/${serial}`, serial, price: giftForm.price.trim() === '' ? null : Number(giftForm.price)
     };
     try {
       const result = await adminPost<{ item: GiftItem }>('/api/catalog', { action: 'create', gift: item });
       setCatalog(old => [result.item, ...old.filter(g => g.id !== result.item.id)]);
-      setGiftForm({ collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '', symbol: '', symbolRarity: '', image: '', source: '' });
+      setGiftForm({ collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '', symbol: '', symbolRarity: '', image: '', source: '', price: '' });
       showToast(t.added);
     } catch (error) { showToast(error instanceof Error ? error.message : t.invalid); }
   };
@@ -526,7 +582,7 @@ function App() {
                   <div className="attribute"><small>{t.backdrop}</small><b><i className={`backdrop-dot ${g.backdrop.toLowerCase().replace(/ /g, '-')}`}/>{g.backdrop}</b><em>{g.backdropRarity}</em></div>
                   <div className="attribute"><small>{t.symbol}</small><b>{g.symbol}</b><em>{g.symbolRarity}</em></div>
                 </div>
-                <div className="gift-card-bottom"><a href={g.source} target="_blank" rel="noreferrer">{t.openNft} <ExternalLink size={12}/></a><span className="unavailable"><ShoppingBag size={14}/>{t.unavailable}</span></div>
+                <div className="gift-card-bottom"><a href={g.source} target="_blank" rel="noreferrer">{t.openNft} <ExternalLink size={12}/></a>{g.price != null ? <button type="button" className="buy-btn" onClick={() => buyNow(g)}><ShoppingBag size={14}/>{fmt(g.price)} ₽</button> : <span className="unavailable"><ShoppingBag size={14}/>{t.unavailable}</span>}</div>
               </div>
             </article>)}
           </div>
@@ -601,6 +657,13 @@ function App() {
         <div className="admin-header"><button className="back-button" onClick={() => go('profile')}><ArrowLeft size={17}/>{t.back}</button><div className="admin-title"><div><span className="eyebrow">PLAYEROK</span><h1>{t.adminTitle}</h1><p>{t.adminSub}</p></div><div className="heading-icon"><ShieldCheck size={22}/></div></div></div>
         <div className="admin-notice"><Globe2 size={17}/><span>{databaseReady ? t.localOnly : `${t.databaseUnavailable} ${databaseError}`}</span></div>
         <div className="admin-tools"><button type="button" onClick={migrateLocalData}><Upload size={15}/>{t.importLocal}</button></div>
+        <section className="admin-form panel">
+          <h2><Gift size={19}/>{lang === 'RU' ? 'Добавить пачкой' : 'Bulk add gifts'}</h2>
+          <label>{lang === 'RU' ? 'Ссылки на подарки (по одной на строку, до 25 за раз)' : 'Gift links (one per line, up to 25 at a time)'}<textarea rows={5} value={batchText} onChange={e => setBatchText(e.target.value)} placeholder={'https://t.me/nft/JellyBunny-12779\nhttps://t.me/nft/PlushPepe-96'}/></label>
+          <label>{lang === 'RU' ? 'Цена для всех, ₽ (необязательно)' : 'Price for all, ₽ (optional)'}<input type="number" min="0" step="any" value={batchPrice} onChange={e => setBatchPrice(e.target.value)} placeholder="1500"/></label>
+          <button className="primary-btn admin-submit" type="button" disabled={batchBusy || !batchText.trim()} onClick={addBatch}><Plus size={17}/>{batchBusy ? (lang === 'RU' ? 'Загружаю…' : 'Loading…') : (lang === 'RU' ? 'Добавить все' : 'Add all')}</button>
+          {batchReport && <p className="admin-hint" style={{ whiteSpace: 'pre-line' }}>{batchReport}</p>}
+        </section>
         <form className="admin-form panel" onSubmit={addGift}>
           <h2><Plus size={19}/>{t.addGift}</h2>
           <label>{t.nftUrl}<input type="url" value={giftForm.source} onChange={e => updateGiftSource(e.target.value)} placeholder="https://t.me/nft/JellyBunny-12779"/><small className="admin-hint">{t.imageHint}</small></label>
@@ -609,6 +672,7 @@ function App() {
           <div className="admin-field-row"><label>{t.model}<input required value={giftForm.model} onChange={e => updateForm('model', e.target.value)} placeholder="Spring Day"/></label><label>{t.modelRarity}<input value={giftForm.modelRarity} onChange={e => updateForm('modelRarity', e.target.value)} placeholder="0.4%"/></label></div>
           <div className="admin-field-row"><label>{t.background}<input required value={giftForm.backdrop} onChange={e => updateForm('backdrop', e.target.value)} placeholder="Electric Purple"/></label><label>{t.backgroundRarity}<input value={giftForm.backdropRarity} onChange={e => updateForm('backdropRarity', e.target.value)} placeholder="0.83%"/></label></div>
           <div className="admin-field-row"><label>{t.pattern}<input required value={giftForm.symbol} onChange={e => updateForm('symbol', e.target.value)} placeholder="Spider Web"/></label><label>{t.patternRarity}<input value={giftForm.symbolRarity} onChange={e => updateForm('symbolRarity', e.target.value)} placeholder="0.55%"/></label></div>
+          <label>{lang === 'RU' ? 'Цена в рублях (необязательно)' : 'Price in rubles (optional)'}<input type="number" min="0" step="any" value={giftForm.price} onChange={e => updateForm('price', e.target.value)} placeholder="1500"/></label>
           <details className="admin-advanced"><summary>{lang === 'RU' ? 'Дополнительные настройки изображения' : 'Advanced image settings'}</summary><label>{t.imageUrl}<input type="url" value={giftForm.image} onChange={e => updateForm('image', e.target.value)} placeholder="https://.../gift.webp"/></label></details>
           {giftForm.image && <div className="admin-image-preview"><small>{t.imagePreview}</small><img src={giftForm.image} alt="Gift preview" onError={e => { e.currentTarget.style.opacity = '0.25'; }}/></div>}
           <button className="primary-btn admin-submit" type="submit"><Plus size={17}/>{t.saveGift}</button>
@@ -616,7 +680,7 @@ function App() {
         <section className="admin-list panel">
           <div className="admin-list-title"><h2>{t.catalogList}</h2><span className="count-pill">{catalog.length}</span></div>
           <div className="admin-tools"><button onClick={exportCatalog}><Upload size={15}/>Export JSON</button><label className="import-button"><ImagePlus size={15}/>Import JSON<input type="file" accept="application/json,.json" onChange={e => { importCatalog(e.target.files?.[0]); e.currentTarget.value = ''; }}/></label></div>
-          {catalog.map(g => <div className="admin-gift-row" key={g.id}><img src={g.image} alt=""/><span><b>{g.collection} #{g.number}</b><small>{g.model} · {g.backdrop} · {g.symbol}</small></span><button aria-label={`${t.delete} ${g.collection} ${g.number}`} onClick={() => deleteGift(g.id)}><Trash2 size={16}/></button></div>)}
+          {catalog.map(g => <div className="admin-gift-row" key={g.id}><img src={g.image} alt=""/><span><b>{g.collection} #{g.number}</b><small>{g.model} · {g.backdrop} · {g.symbol}</small><span className="price-edit"><input type="number" min="0" step="any" placeholder={lang === 'RU' ? 'Цена ₽' : 'Price ₽'} value={priceEdits[g.id] ?? (g.price ?? '')} onChange={e => setPriceEdits(old => ({ ...old, [g.id]: e.target.value }))}/><button type="button" aria-label="Save price" onClick={() => savePrice(g.id)}><CheckCircle2 size={15}/></button></span></span><button aria-label={`${t.delete} ${g.collection} ${g.number}`} onClick={() => deleteGift(g.id)}><Trash2 size={16}/></button></div>)}
         </section>
         <form className="admin-form panel review-admin-form" onSubmit={saveStats}>
           <h2><Wallet size={19}/>{t.statsTitle}</h2>
@@ -652,6 +716,14 @@ function App() {
       <a href={botUrl} target="_blank" rel="noreferrer">@Playerok_Guarantor_Bot <ExternalLink size={11}/></a>
       <span>Playerok</span>
     </footer>
+    {buyGift && <div className="modal-back" onClick={() => setBuyGift(null)}><div className="modal-card" role="dialog" onClick={e => e.stopPropagation()}>
+      <button className="modal-x" aria-label="Close" onClick={() => setBuyGift(null)}><X size={16}/></button>
+      <div className="modal-icon"><Wallet size={24}/></div>
+      <h3>{lang === 'RU' ? 'Недостаточно средств на балансе' : 'Insufficient balance'}</h3>
+      <p>{lang === 'RU' ? `Цена: ${fmt(buyGift.price ?? 0)} ₽, ваш баланс: ${fmt(stats.balance)} ₽. Пополните баланс через бота или менеджера.` : `Price: ${fmt(buyGift.price ?? 0)} ₽, your balance: ${fmt(stats.balance)} ₽. Top up via the bot or the manager.`}</p>
+      <a className="primary-btn" href={botUrl} target="_blank" rel="noreferrer"><ShieldCheck size={16}/>{lang === 'RU' ? 'Пополнить через бота' : 'Top up via bot'}</a>
+      <a className="primary-btn modal-alt" href={managerUrl} target="_blank" rel="noreferrer"><UserRound size={16}/>{lang === 'RU' ? 'Написать менеджеру' : 'Contact manager'}</a>
+    </div></div>}
     {toast && <div className="toast"><CheckCircle2 size={16}/>{toast}</div>}
   </div>;
 }

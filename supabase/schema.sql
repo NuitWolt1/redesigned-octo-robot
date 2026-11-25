@@ -62,3 +62,7 @@ alter table public.user_stats enable row level security;
 revoke all on table public.user_stats from anon, authenticated;
 grant select, insert, update, delete on table public.user_stats to service_role;
 notify pgrst, 'reload schema';
+
+-- Gift price in rubles (NULL = not for sale / "Unavailable").
+alter table public.market_gifts add column if not exists price_rub numeric(12,2) check (price_rub is null or price_rub >= 0);
+notify pgrst, 'reload schema';

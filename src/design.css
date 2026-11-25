@@ -124,3 +124,16 @@ body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),t
 .wd-refresh{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);color:var(--muted)}
 .wd-submit{border:0;border-radius:16px;min-height:50px;font-weight:800;font-size:14px;color:#fff;background:var(--grad);display:flex;align-items:center;justify-content:center;gap:8px;opacity:.5}
 .wd-note{margin:0;text-align:center;font-size:10.5px;color:var(--muted)}
+
+/* ===== Цены, кнопка «Купить», окно «нет средств» ===== */
+.buy-btn{border:0;border-radius:12px;padding:7px 12px;background:var(--grad);color:#fff;font-weight:900;font-size:12px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 6px 14px rgba(43,92,255,.35);transition:transform .3s var(--spring)}
+.buy-btn:active{transform:scale(.9)}
+.price-edit{display:flex;gap:6px;margin-top:6px}.price-edit input{width:96px;min-height:32px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:0 8px;font-size:12px}
+.price-edit button{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:var(--soft-blue);color:var(--blue);display:grid;place-items:center}
+.modal-back{position:fixed;inset:0;z-index:20000;background:rgba(8,12,28,.5);backdrop-filter:blur(6px);display:grid;place-items:center;padding:20px;animation:fadeIn .25s both}
+.modal-card{position:relative;width:min(100%,360px);border-radius:28px;padding:24px 20px 20px;text-align:center;background:var(--surface);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(26px) saturate(180%);box-shadow:0 24px 60px rgba(0,0,0,.35),inset 0 1.5px 0 rgba(255,255,255,.6);display:flex;flex-direction:column;gap:10px;animation:menuPop .4s var(--spring)}
+.modal-card h3{margin:0;font-size:19px;font-weight:900}.modal-card p{margin:0 0 6px;color:var(--muted);font-size:13px;line-height:1.45}
+.modal-card .primary-btn{margin:0;text-decoration:none}.modal-alt{background:var(--surface-2)!important;color:var(--blue)!important;box-shadow:none!important;border:1px solid var(--line)}
+.modal-icon{width:54px;height:54px;border-radius:18px;margin:0 auto;background:var(--soft-blue);color:var(--blue);display:grid;place-items:center}
+.modal-x{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);display:grid;place-items:center}
+@keyframes fadeIn{from{opacity:0}}
