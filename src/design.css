@@ -4,9 +4,6 @@
 html,body{background:var(--bg)}
 body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),transparent 60%),radial-gradient(50vmax 45vmax at 100% 20%,rgba(150,90,255,.20),transparent 60%),radial-gradient(60vmax 50vmax at 40% 110%,rgba(40,200,255,.18),transparent 60%),var(--bg);background-attachment:fixed}
 .app-shell{background:transparent}
-.app-shell:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(260px 260px at 20% 30%,rgba(90,130,255,.22),transparent 70%),radial-gradient(300px 300px at 85% 70%,rgba(170,100,255,.18),transparent 70%);animation:aurora 16s ease-in-out infinite alternate;filter:blur(30px)}
-.app-shell>*{position:relative;z-index:1}
-@keyframes aurora{to{transform:translate3d(-6%,5%,0) scale(1.15)}}
 
 /* верхняя панель — стекло */
 .topbar{background:var(--surface);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 8px 30px rgba(20,40,100,.06);animation:dropIn .7s var(--ease) both}
@@ -23,19 +20,16 @@ body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),t
 /* контент: плавное появление */
 .main-content>*{animation:riseIn .65s var(--ease) both}
 .main-content>*:nth-child(2){animation-delay:.07s}.main-content>*:nth-child(3){animation-delay:.14s}.main-content>*:nth-child(4){animation-delay:.21s}.main-content>*:nth-child(n+5){animation-delay:.28s}
-@keyframes riseIn{from{opacity:0;transform:translateY(26px) scale(.97);filter:blur(6px)}}
+@keyframes riseIn{from{opacity:0;transform:translateY(26px) scale(.97)}}
 
 /* панели — стекло */
-.panel{background:var(--surface);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--line);border-radius:26px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:26px;box-shadow:var(--shadow);position:relative;overflow:hidden}
 .panel:before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(160deg,rgba(255,255,255,.35),transparent 35%);opacity:.6}
 :root[data-theme=dark] .panel:before{opacity:.12}
 
 /* баннер */
-.banner-art{border-radius:22px;background:radial-gradient(circle at 78% 50%,#5b7dff 0,#2b3fd8 38%,#1a1260 85%);box-shadow:0 18px 40px rgba(43,70,220,.38),inset 0 1px 0 rgba(255,255,255,.35);background-size:140% 140%;animation:bannerFlow 9s ease-in-out infinite alternate}
-@keyframes bannerFlow{from{background-position:0 0}to{background-position:100% 100%}}
-.banner-art:before{animation:orbit 12s linear infinite}
-.banner-art:after{animation:orbit 18s linear infinite reverse}
-@keyframes orbit{50%{transform:rotate(-12deg) translateX(-14px)}}
+.banner-art{border-radius:22px;background:radial-gradient(circle at 78% 50%,#5b7dff 0,#2b3fd8 38%,#1a1260 85%);box-shadow:0 18px 40px rgba(43,70,220,.38),inset 0 1px 0 rgba(255,255,255,.35);background-size:140% 140%}
+
 .banner-caption strong{background:linear-gradient(180deg,#fff,#c9d7ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25))}
 .banner-gift{animation:floaty 4.5s ease-in-out infinite;filter:drop-shadow(0 14px 22px rgba(0,0,0,.4))}
 @keyframes floaty{50%{transform:translateY(-12px) rotate(6deg)}}
@@ -45,7 +39,7 @@ body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),t
 @keyframes twinkle{50%{opacity:.25;transform:scale(.6) rotate(25deg)}}
 
 /* карточки подарков */
-.gift-card{border-radius:22px;background:var(--surface);backdrop-filter:blur(16px) saturate(150%);border:1px solid var(--line);box-shadow:0 8px 24px rgba(30,55,120,.09);transition:transform .45s var(--spring),box-shadow .45s var(--ease);animation:cardIn .7s var(--spring) both;position:relative}
+.gift-card{border-radius:22px;background:var(--surface);border:1px solid var(--line);box-shadow:0 8px 24px rgba(30,55,120,.09);transition:transform .45s var(--spring),box-shadow .45s var(--ease);animation:cardIn .7s var(--spring) both;position:relative}
 .gift-card:hover{transform:translateY(-6px) scale(1.02);box-shadow:0 22px 44px rgba(43,92,255,.22)}
 .gift-card:active{transform:scale(.96)}
 .gift-card:before{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:inherit;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.35) 50%,transparent 65%);transform:translateX(-120%);transition:transform .8s var(--ease)}
@@ -54,25 +48,22 @@ body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),t
 .gift-art>*{transition:transform .6s var(--spring)}.gift-card:hover .gift-art>*{transform:scale(1.1) rotate(-3deg)}
 .gift-grid>*:nth-child(1){animation-delay:.05s}.gift-grid>*:nth-child(2){animation-delay:.1s}.gift-grid>*:nth-child(3){animation-delay:.15s}.gift-grid>*:nth-child(4){animation-delay:.2s}.gift-grid>*:nth-child(5){animation-delay:.25s}.gift-grid>*:nth-child(6){animation-delay:.3s}.gift-grid>*:nth-child(n+7){animation-delay:.36s}
 @keyframes cardIn{from{opacity:0;transform:translateY(34px) scale(.88) rotate(1.5deg)}}
-.attribute,.stat{background:var(--surface-2);border:1px solid var(--line);backdrop-filter:blur(10px);border-radius:16px;transition:transform .3s var(--spring)}
+.attribute,.stat{background:var(--surface-2);border:1px solid var(--line);border-radius:16px;transition:transform .3s var(--spring)}
 .attribute:hover,.stat:hover{transform:translateY(-3px)}
-.serial-ribbon,.premium-chip,.count-pill{backdrop-filter:blur(10px)}
-.premium-chip{animation:glow 2.6s ease-in-out infinite}
-@keyframes glow{50%{box-shadow:0 0 18px rgba(255,190,60,.6)}}
+.serial-ribbon,.count-pill{backdrop-filter:blur(10px)}
 
 /* поиск, вкладки */
-.searchbox{background:var(--surface);backdrop-filter:blur(18px);border-radius:18px;border:1px solid var(--line);transition:box-shadow .35s,transform .35s var(--spring)}
+.searchbox{background:var(--surface);border-radius:18px;border:1px solid var(--line);transition:box-shadow .35s,transform .35s var(--spring)}
 .searchbox:focus-within{transform:scale(1.015);box-shadow:0 0 0 3px rgba(43,92,255,.22),0 12px 28px rgba(43,92,255,.15)}
 .sort-tabs button,.subtabs button{transition:all .35s var(--spring)}.sort-tabs button:active,.subtabs button:active{transform:scale(.92)}
 
 /* кнопки */
-.primary-btn,.connect-button,.admin-submit{background:var(--grad);background-size:200% 200%;border-radius:16px;box-shadow:0 10px 24px rgba(43,92,255,.38),inset 0 1px 0 rgba(255,255,255,.4);transition:transform .3s var(--spring),box-shadow .3s;animation:gradMove 6s ease infinite;position:relative;overflow:hidden}
-@keyframes gradMove{50%{background-position:100% 50%}}
+.primary-btn,.connect-button,.admin-submit{background:var(--grad);background-size:200% 200%;border-radius:16px;box-shadow:0 10px 24px rgba(43,92,255,.38),inset 0 1px 0 rgba(255,255,255,.4);transition:transform .3s var(--spring),box-shadow .3s;position:relative;overflow:hidden}
 .primary-btn:hover,.connect-button:hover,.admin-submit:hover{transform:translateY(-3px);box-shadow:0 16px 32px rgba(43,92,255,.5)}
 .primary-btn:active,.connect-button:active,.admin-submit:active{transform:scale(.93)}
-.hero-icon,.empty-hero .hero-icon,.reviews-empty-icon,.personal-empty-icon{animation:floaty 4s ease-in-out infinite;box-shadow:0 14px 30px rgba(43,92,255,.25);backdrop-filter:blur(10px)}
+.hero-icon,.empty-hero .hero-icon,.reviews-empty-icon,.personal-empty-icon{animation:floaty 4s ease-in-out infinite;box-shadow:0 14px 30px rgba(43,92,255,.25)}
 .avatar,.avatar-photo{box-shadow:0 0 0 3px rgba(255,255,255,.6),0 10px 24px rgba(43,92,255,.3);animation:logoPop .9s var(--spring) both}
-.review-card{border-radius:22px;background:var(--surface);backdrop-filter:blur(16px);transition:transform .4s var(--spring);animation:cardIn .6s var(--spring) both}
+.review-card{border-radius:22px;background:var(--surface);transition:transform .4s var(--spring);animation:cardIn .6s var(--spring) both}
 .review-card:hover{transform:translateY(-4px)}
 .review-card-stars,.review-stars{filter:drop-shadow(0 0 6px rgba(255,190,40,.55))}
 
@@ -81,18 +72,18 @@ body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),t
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,40px) scale(.8)}}
 
 /* ===== ЖИДКОЕ СТЕКЛО: нижняя панель (стиль iOS) ===== */
-.bottom-nav{height:72px;padding:6px;gap:2px;border-radius:36px;border:1px solid rgba(255,255,255,.55);background:linear-gradient(135deg,rgba(255,255,255,.55),rgba(255,255,255,.18));backdrop-filter:blur(26px) saturate(210%) brightness(1.06);-webkit-backdrop-filter:blur(26px) saturate(210%) brightness(1.06);box-shadow:0 18px 44px rgba(20,40,110,.22),0 2px 6px rgba(20,40,110,.08),inset 0 1.5px 0 rgba(255,255,255,.95),inset 0 -1.5px 0 rgba(255,255,255,.35),inset 0 0 22px rgba(255,255,255,.35);animation:navUp .9s var(--spring) .3s both;overflow:hidden}
+.bottom-nav{height:72px;padding:6px;gap:2px;border-radius:36px;border:1px solid rgba(255,255,255,.55);background:linear-gradient(135deg,rgba(255,255,255,.55),rgba(255,255,255,.18));backdrop-filter:blur(26px) saturate(210%) brightness(1.06);-webkit-backdrop-filter:blur(26px) saturate(210%) brightness(1.06);box-shadow:0 18px 44px rgba(20,40,110,.22),0 2px 6px rgba(20,40,110,.08),inset 0 1.5px 0 rgba(255,255,255,.95),inset 0 -1.5px 0 rgba(255,255,255,.35),inset 0 0 22px rgba(255,255,255,.35);overflow:hidden;position:fixed;z-index:9999;transform:translateX(-50%);will-change:auto}
 :root[data-theme=dark] .bottom-nav{border-color:rgba(255,255,255,.18);background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.04));box-shadow:0 18px 44px rgba(0,0,0,.55),inset 0 1.5px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(255,255,255,.08),inset 0 0 22px rgba(255,255,255,.06)}
-@keyframes navUp{from{transform:translate(-50%,140%) scale(.9);opacity:0}}
-.bottom-nav:before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(120% 90% at 20% -20%,rgba(255,255,255,.7),transparent 55%),linear-gradient(100deg,transparent 40%,rgba(255,255,255,.28) 50%,transparent 60%);background-size:100% 100%,250% 100%;animation:glassSheen 7s ease-in-out infinite;opacity:.7}
-@keyframes glassSheen{0%{background-position:0 0,150% 0}60%,100%{background-position:0 0,-100% 0}}
+.bottom-nav:before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(120% 90% at 20% -20%,rgba(255,255,255,.7),transparent 55%),linear-gradient(100deg,transparent 40%,rgba(255,255,255,.28) 50%,transparent 60%);background-size:100% 100%,250% 100%;background-position:0 0,40% 0;opacity:.7}
 .nav-item{position:relative;z-index:1;border-radius:30px;transition:color .35s,transform .4s var(--spring);-webkit-tap-highlight-color:transparent}
 .nav-item svg{transition:transform .5s var(--spring),filter .35s}
-.nav-item:active{transform:scale(.86)}
-.nav-item.active{background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.25));color:var(--blue);box-shadow:0 6px 16px rgba(43,92,255,.2),inset 0 1.5px 0 rgba(255,255,255,.95),inset 0 -1px 2px rgba(43,92,255,.12),inset 0 0 0 1px rgba(255,255,255,.5);backdrop-filter:blur(8px) brightness(1.1);animation:lensIn .55s var(--spring)}
+.nav-item:active{transform:scale(.92)}
+.nav-item.active{background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.25));color:var(--blue);box-shadow:0 6px 16px rgba(43,92,255,.2),inset 0 1.5px 0 rgba(255,255,255,.95),inset 0 -1px 2px rgba(43,92,255,.12),inset 0 0 0 1px rgba(255,255,255,.5);backdrop-filter:blur(8px) brightness(1.1)}
 :root[data-theme=dark] .nav-item.active{background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,.07));color:#8fb0ff;box-shadow:0 6px 18px rgba(0,0,0,.4),inset 0 1.5px 0 rgba(255,255,255,.4),inset 0 0 0 1px rgba(255,255,255,.12)}
-@keyframes lensIn{0%{transform:scale(.7)}60%{transform:scale(1.08)}}
-.nav-item.active svg{transform:translateY(-2px) scale(1.18);filter:drop-shadow(0 4px 8px rgba(43,92,255,.45));animation:iconHop .6s var(--spring)}
-@keyframes iconHop{0%{transform:translateY(8px) scale(.8)}}
+.nav-item.active svg{transform:translateY(-2px) scale(1.18);filter:drop-shadow(0 4px 8px rgba(43,92,255,.45))}
 .nav-item.active span{font-weight:900}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+.bottom-nav{position:fixed!important;bottom:14px;z-index:9999!important;contain:layout paint;-webkit-transform:translateX(-50%);transform:translateX(-50%)!important}.toast{z-index:10000}
+.gift-card{contain:layout style}
+@media(max-width:390px){.bottom-nav{bottom:9px}}
