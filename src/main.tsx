@@ -65,44 +65,6 @@ const REVIEWS_STORAGE_KEY = 'playerok.reviews.v1';
 const botUrl = 'https://t.me/Playerok_Guarantor_Bot';
 
 // Коллекционные подарки Telegram. Все изображения ведут на публичные NFT-превью Fragment.
-const initialGifts: GiftItem[] = [
-  {
-    id: 'cookie-heart-3865', collection: 'Cookie Heart', number: 3865,
-    model: 'Toasted', modelRarity: '1%', backdrop: 'Aquamarine', backdropRarity: '2%',
-    symbol: 'Red Deer', symbolRarity: '0.2%',
-    image: 'https://nft.fragment.com/gift/cookieheart-3865.webp',
-    source: 'https://t.me/nft/CookieHeart-3865', serial: 'CookieHeart-3865'
-  },
-  {
-    id: 'jelly-bunny-12779', collection: 'Jelly Bunny', number: 12779,
-    model: 'Spring Day', modelRarity: '0.4%', backdrop: 'Electric Purple', backdropRarity: '0.83%',
-    symbol: 'Spider Web', symbolRarity: '0.55%',
-    image: 'https://nft.fragment.com/gift/jellybunny-12779.webp',
-    source: 'https://t.me/nft/JellyBunny-12779', serial: 'JellyBunny-12779'
-  },
-  {
-    id: 'durovs-cap-1361', collection: "Durov's Cap", number: 1361,
-    model: 'Macintosh', modelRarity: '2.43%', backdrop: 'Azure Blue', backdropRarity: '1.95%',
-    symbol: 'Cocktail', symbolRarity: '0.99%',
-    image: 'https://nft.fragment.com/gift/durovscap-1361.webp',
-    source: 'https://t.me/nft/DurovsCap-1361', serial: 'DurovsCap-1361'
-  },
-  {
-    id: 'jelly-bunny-5286', collection: 'Jelly Bunny', number: 5286,
-    model: 'Firefruit', modelRarity: '0.51%', backdrop: 'Lemongrass', backdropRarity: '1.84%',
-    symbol: 'Rocket', symbolRarity: '0.48%',
-    image: 'https://nft.fragment.com/gift/jellybunny-5286.webp',
-    source: 'https://t.me/nft/JellyBunny-5286', serial: 'JellyBunny-5286'
-  },
-  {
-    id: 'plushpepe-96', collection: 'Plush Pepe', number: 96,
-    model: 'Princess', modelRarity: '2.1%', backdrop: 'Grape', backdropRarity: '2.05%',
-    symbol: 'Toilet', symbolRarity: '0.5%',
-    image: 'https://nft.fragment.com/gift/plushpepe-96.webp',
-    source: 'https://t.me/nft/PlushPepe-96', serial: 'PlushPepe-96'
-  }
-];
-
 const nav: { id: Exclude<Tab, 'admin'>; label: string; ru: string; icon: typeof Gamepad2 }[] = [
   { id: 'games', label: 'Games', ru: 'Игры', icon: Gamepad2 },
   { id: 'market', label: 'Market', ru: 'Маркет', icon: Gift },
@@ -132,7 +94,9 @@ const copy = {
     telegramConnect: 'Open this app from Telegram to show your profile.', connect: 'Open Telegram bot',
     account: 'TELEGRAM ACCOUNT', connected: 'Telegram profile connected', notConnected: 'Telegram profile not found',
     premium: 'TELEGRAM PREMIUM', admin: 'Manage catalog', adminTitle: 'Admin panel', adminSub: 'Add and remove collectible gifts from the catalog.', adminDenied: 'Administrator access is required.',
-    localOnly: 'Gifts and reviews are saved in this browser only. To show the same catalog and reviews to every visitor, connect a shared database.',
+    localOnly: 'Shared database connected. Gifts and reviews are visible to every visitor; only authorized administrators can change them.',
+    databaseUnavailable: 'Shared database is not connected yet. Add the Supabase environment variables in Vercel and run the SQL setup.',
+    importLocal: 'Transfer saved data from this device', importDone: 'Local data transferred to the shared database.',
     addGift: 'Add a gift', collectionName: 'Gift collection', number: 'Gift number', modelName: 'Model', modelRarity: 'Model rarity',
     background: 'Background', backgroundRarity: 'Background rarity', pattern: 'Pattern', patternRarity: 'Pattern rarity',
     imageUrl: 'Custom image URL (optional)', nftUrl: 'Paste Telegram NFT link', imageHint: 'Just paste a Telegram NFT link, for example https://t.me/nft/JellyBunny-12779. Collection, number and gift image will fill in automatically — no image URL needed.', imagePreview: 'Image preview',
@@ -161,7 +125,9 @@ const copy = {
     telegramConnect: 'Открой приложение через Telegram, чтобы увидеть свой профиль.', connect: 'Открыть Telegram-бота',
     account: 'АККАУНТ TELEGRAM', connected: 'Профиль Telegram подключён', notConnected: 'Профиль Telegram не найден',
     premium: 'TELEGRAM PREMIUM', admin: 'Управление каталогом', adminTitle: 'Панель администратора', adminSub: 'Добавление и удаление коллекционных подарков.', adminDenied: 'Доступ разрешён только администраторам.',
-    localOnly: 'Подарки и отзывы сохраняются только в этом браузере. Чтобы каталог и отзывы были одинаковыми у всех посетителей, подключи общую базу данных.',
+    localOnly: 'Общая база подключена. Подарки и отзывы видны всем посетителям; изменять их могут только администраторы.',
+    databaseUnavailable: 'Общая база ещё не подключена. Добавь переменные Supabase в Vercel и выполни SQL-настройку.',
+    importLocal: 'Перенести данные с этого устройства', importDone: 'Локальные данные перенесены в общую базу.',
     addGift: 'Добавить подарок', collectionName: 'Коллекция подарка', number: 'Номер подарка', modelName: 'Модель', modelRarity: 'Редкость модели',
     background: 'Фон', backgroundRarity: 'Редкость фона', pattern: 'Узор', patternRarity: 'Редкость узора',
     imageUrl: 'Своя ссылка на изображение (необязательно)', nftUrl: 'Вставь ссылку на Telegram NFT', imageHint: 'Просто вставь ссылку на подарок, например https://t.me/nft/JellyBunny-12779. Коллекция, номер и изображение заполнятся автоматически — искать ссылку на картинку не нужно.', imagePreview: 'Предпросмотр изображения',
@@ -172,39 +138,6 @@ const copy = {
     userName: 'ИМЯ', total: 'ЛОТОВ'
   }
 };
-
-function loadCatalog(): GiftItem[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return initialGifts;
-    const parsed: unknown = JSON.parse(stored);
-    if (Array.isArray(parsed)) return parsed as GiftItem[];
-  } catch (error) {
-    console.warn('Could not read the saved catalog:', error);
-  }
-  return initialGifts;
-}
-
-function loadReviews(): ReviewItem[] {
-  try {
-    const stored = localStorage.getItem(REVIEWS_STORAGE_KEY);
-    if (!stored) return [];
-    const parsed: unknown = JSON.parse(stored);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((item): item is ReviewItem => Boolean(
-        item && typeof item === 'object' &&
-        typeof (item as ReviewItem).id === 'string' &&
-        typeof (item as ReviewItem).username === 'string' &&
-        Number.isInteger((item as ReviewItem).rating) &&
-        (item as ReviewItem).rating >= 1 && (item as ReviewItem).rating <= 5 &&
-        typeof (item as ReviewItem).text === 'string'
-      ));
-    }
-  } catch (error) {
-    console.warn('Could not read saved reviews:', error);
-  }
-  return [];
-}
 
 function getTelegramUser(): TelegramUser | null {
   const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -242,6 +175,26 @@ function parseGiftLink(value: string): { collection: string; number: string; slu
   }
 }
 
+async function apiGet<T>(path: string): Promise<T> {
+  const response = await fetch(path, { method: 'GET', cache: 'no-store' });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : `Request failed (${response.status}).`);
+  return data as T;
+}
+
+async function adminPost<T>(path: string, payload: Record<string, unknown>): Promise<T> {
+  const initData = window.Telegram?.WebApp?.initData || '';
+  if (!initData) throw new Error('Open the Mini App inside Telegram as an administrator.');
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, initData })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : `Request failed (${response.status}).`);
+  return data as T;
+}
+
 function App() {
   const [tab, setTab] = useState<Tab>('market');
   const [lang, setLang] = useState<Lang>(() => {
@@ -258,8 +211,10 @@ function App() {
   const [sort, setSort] = useState<Sort>('featured');
   const [sub, setSub] = useState<'gifts' | 'offers' | 'history'>('gifts');
   const [langOpen, setLangOpen] = useState(false);
-  const [catalog, setCatalog] = useState<GiftItem[]>(loadCatalog);
-  const [reviews, setReviews] = useState<ReviewItem[]>(loadReviews);
+  const [catalog, setCatalog] = useState<GiftItem[]>([]);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [databaseReady, setDatabaseReady] = useState(false);
+  const [databaseError, setDatabaseError] = useState('');
   const [reviewForm, setReviewForm] = useState({ username: '', rating: 5, text: '' });
   const [toast, setToast] = useState('');
   const [giftForm, setGiftForm] = useState({
@@ -305,12 +260,33 @@ function App() {
   }, [tab, isAdmin]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(catalog));
-  }, [catalog]);
-
-  useEffect(() => {
-    localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(reviews));
-  }, [reviews]);
+    let active = true;
+    const refreshSharedData = async () => {
+      try {
+        const [giftResult, reviewResult] = await Promise.all([
+          apiGet<{ items: GiftItem[] }>('/api/catalog'),
+          apiGet<{ items: ReviewItem[] }>('/api/reviews')
+        ]);
+        if (!active) return;
+        setCatalog(Array.isArray(giftResult.items) ? giftResult.items : []);
+        setReviews(Array.isArray(reviewResult.items) ? reviewResult.items : []);
+        setDatabaseReady(true);
+        setDatabaseError('');
+      } catch (error) {
+        if (!active) return;
+        setDatabaseReady(false);
+        setDatabaseError(error instanceof Error ? error.message : 'Shared database is unavailable.');
+      }
+    };
+    void refreshSharedData();
+    const interval = window.setInterval(refreshSharedData, 20000);
+    window.addEventListener('focus', refreshSharedData);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshSharedData);
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme);
@@ -343,7 +319,7 @@ function App() {
     const parsed = parseGiftLink(value);
     setGiftForm(old => parsed ? ({ ...old, source: parsed.source, collection: parsed.collection, number: parsed.number, image: parsed.image }) : ({ ...old, source: value }));
   };
-  const addGift = (event: React.FormEvent<HTMLFormElement>) => {
+  const addGift = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isAdmin) { showToast(t.adminDenied); return; }
     const required = ['collection', 'number', 'model', 'backdrop', 'symbol'] as const;
@@ -356,10 +332,10 @@ function App() {
     const imageValue = giftForm.image.trim() || `https://nft.fragment.com/gift/${serial}.webp`;
     let imageUrl: URL;
     try { imageUrl = new URL(imageValue); } catch { showToast(t.invalid); return; }
-    if (!['https:', 'http:'].includes(imageUrl.protocol)) { showToast(t.invalid); return; }
+    if (imageUrl.protocol !== 'https:') { showToast(t.invalid); return; }
     let source = giftForm.source.trim();
     if (source) {
-      try { const u = new URL(source); if (!['https:', 'http:'].includes(u.protocol)) throw new Error('URL'); }
+      try { const u = new URL(source); if (u.protocol !== 'https:') throw new Error('URL'); }
       catch { showToast(t.invalid); return; }
     }
     const item: GiftItem = {
@@ -369,14 +345,20 @@ function App() {
       symbol: giftForm.symbol.trim(), symbolRarity: giftForm.symbolRarity.trim() || '—',
       image: imageUrl.href, source: source || `https://t.me/nft/${serial}`, serial
     };
-    setCatalog(old => [item, ...old]);
-    setGiftForm({ collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '', symbol: '', symbolRarity: '', image: '', source: '' });
-    showToast(t.added);
+    try {
+      const result = await adminPost<{ item: GiftItem }>('/api/catalog', { action: 'create', gift: item });
+      setCatalog(old => [result.item, ...old.filter(g => g.id !== result.item.id)]);
+      setGiftForm({ collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '', symbol: '', symbolRarity: '', image: '', source: '' });
+      showToast(t.added);
+    } catch (error) { showToast(error instanceof Error ? error.message : t.invalid); }
   };
-  const deleteGift = (id: string) => {
+  const deleteGift = async (id: string) => {
     if (!isAdmin) { showToast(t.adminDenied); return; }
-    setCatalog(old => old.filter(g => g.id !== id));
-    showToast(t.removed);
+    try {
+      await adminPost('/api/catalog', { action: 'delete', id });
+      setCatalog(old => old.filter(g => g.id !== id));
+      showToast(t.removed);
+    } catch (error) { showToast(error instanceof Error ? error.message : t.adminDenied); }
   };
   const exportCatalog = () => {
     if (!isAdmin) { showToast(t.adminDenied); return; }
@@ -390,16 +372,19 @@ function App() {
     if (!isAdmin) { showToast(t.adminDenied); return; }
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (!Array.isArray(parsed) || !parsed.every(g => g && typeof g.collection === 'string' && typeof g.image === 'string')) throw new Error('Invalid catalog');
-        setCatalog(parsed as GiftItem[]); showToast(t.added);
-      } catch { showToast(t.invalid); }
+        const result = await adminPost<{ imported: number }>('/api/catalog', { action: 'import', items: parsed });
+        const refreshed = await apiGet<{ items: GiftItem[] }>('/api/catalog');
+        setCatalog(refreshed.items);
+        showToast(`${t.added}: ${result.imported}`);
+      } catch (error) { showToast(error instanceof Error ? error.message : t.invalid); }
     };
     reader.readAsText(file);
   };
-  const addReview = (event: React.FormEvent<HTMLFormElement>) => {
+  const addReview = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isAdmin) { showToast(t.adminDenied); return; }
     const username = reviewForm.username.trim();
@@ -407,18 +392,38 @@ function App() {
     if (!username || !text || !Number.isInteger(reviewForm.rating) || reviewForm.rating < 1 || reviewForm.rating > 5) {
       showToast(t.invalidReview); return;
     }
-    const item: ReviewItem = {
-      id: `review-${Date.now()}`, username, rating: reviewForm.rating, text, createdAt: Date.now()
-    };
-    setReviews(old => [item, ...old]);
-    setReviewForm({ username: '', rating: 5, text: '' });
-    showToast(t.reviewAdded);
+    const item: ReviewItem = { id: `review-${Date.now()}`, username, rating: reviewForm.rating, text, createdAt: Date.now() };
+    try {
+      const result = await adminPost<{ item: ReviewItem }>('/api/reviews', { action: 'create', review: item });
+      setReviews(old => [result.item, ...old.filter(review => review.id !== result.item.id)]);
+      setReviewForm({ username: '', rating: 5, text: '' });
+      showToast(t.reviewAdded);
+    } catch (error) { showToast(error instanceof Error ? error.message : t.invalidReview); }
   };
-  const deleteReview = (id: string) => {
+  const deleteReview = async (id: string) => {
     if (!isAdmin) { showToast(t.adminDenied); return; }
-    setReviews(old => old.filter(review => review.id !== id));
-    showToast(t.reviewRemoved);
+    try {
+      await adminPost('/api/reviews', { action: 'delete', id });
+      setReviews(old => old.filter(review => review.id !== id));
+      showToast(t.reviewRemoved);
+    } catch (error) { showToast(error instanceof Error ? error.message : t.adminDenied); }
   };
+  const migrateLocalData = async () => {
+    if (!isAdmin) { showToast(t.adminDenied); return; }
+    try {
+      const savedGifts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') as GiftItem[];
+      const savedReviews = JSON.parse(localStorage.getItem(REVIEWS_STORAGE_KEY) || '[]') as ReviewItem[];
+      if (savedGifts.length) await adminPost('/api/catalog', { action: 'import', items: savedGifts });
+      if (savedReviews.length) await adminPost('/api/reviews', { action: 'import', items: savedReviews });
+      const [giftResult, reviewResult] = await Promise.all([
+        apiGet<{ items: GiftItem[] }>('/api/catalog'), apiGet<{ items: ReviewItem[] }>('/api/reviews')
+      ]);
+      setCatalog(giftResult.items);
+      setReviews(reviewResult.items);
+      showToast(t.importDone);
+    } catch (error) { showToast(error instanceof Error ? error.message : t.invalid); }
+  };
+
   const averageRating = reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : 0;
   const fullName = telegramUser ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ') : '';
   const initials = fullName ? fullName.slice(0, 1).toUpperCase() : 'P';
@@ -521,6 +526,7 @@ function App() {
           <div className="review-score"><strong>{reviews.length ? averageRating.toFixed(1) : '—'}</strong><div><div className="review-stars">{[1,2,3,4,5].map(star => <Star key={star} size={16} fill={star <= Math.round(averageRating) ? 'currentColor' : 'none'}/>)}</div><small>{reviews.length} {t.reviewCount.toLowerCase()}</small></div></div>
           <div className="review-summary-label">{t.averageRating}</div>
         </div>
+        {databaseError && <div className="admin-notice"><Globe2 size={17}/><span>{t.databaseUnavailable}</span></div>}
         {reviews.length ? <div className="reviews-list">{reviews.map(review => <article className="review-card panel" key={review.id}>
           <div className="review-card-head"><div className="review-avatar">{review.username.trim().slice(0,1).toUpperCase()}</div><div className="review-author"><b>{review.username}</b><small>{new Date(review.createdAt).toLocaleDateString(lang === 'RU' ? 'ru-RU' : 'en-US')}</small></div><div className="review-card-stars" aria-label={`${review.rating} / 5`}>{[1,2,3,4,5].map(star => <Star key={star} size={14} fill={star <= review.rating ? 'currentColor' : 'none'}/>)}</div></div>
           <p>{review.text}</p>
@@ -556,7 +562,8 @@ function App() {
 
       {tab === 'admin' && isAdmin && <section className="admin-page">
         <div className="admin-header"><button className="back-button" onClick={() => go('profile')}><ArrowLeft size={17}/>{t.back}</button><div className="admin-title"><div><span className="eyebrow">PLAYEROK</span><h1>{t.adminTitle}</h1><p>{t.adminSub}</p></div><div className="heading-icon"><ShieldCheck size={22}/></div></div></div>
-        <div className="admin-notice"><Globe2 size={17}/><span>{t.localOnly}</span></div>
+        <div className="admin-notice"><Globe2 size={17}/><span>{databaseReady ? t.localOnly : `${t.databaseUnavailable} ${databaseError}`}</span></div>
+        <div className="admin-tools"><button type="button" onClick={migrateLocalData}><Upload size={15}/>{t.importLocal}</button></div>
         <form className="admin-form panel" onSubmit={addGift}>
           <h2><Plus size={19}/>{t.addGift}</h2>
           <label>{t.nftUrl}<input type="url" value={giftForm.source} onChange={e => updateGiftSource(e.target.value)} placeholder="https://t.me/nft/JellyBunny-12779"/><small className="admin-hint">{t.imageHint}</small></label>
