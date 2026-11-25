@@ -343,7 +343,21 @@ function App() {
   };
   const addBatch = async () => {
     if (!isAdmin) { showToast(t.adminDenied); return; }
-    const found = [...new Set((batchText.match(/(?:https?:\/\/)?t\.me\/nft\/[A-Za-z0-9_-]+-\d+/gi) || []).map(l => l.split('/nft/')[1]))];
+    // Формат строки: ссылка и цена через пробел, например «https://t.me/nft/MoodPack-112928 1900»
+    const priceMap = new Map<string, number>();
+    const order: string[] = [];
+    for (const line of batchText.split(/\r?\n/)) {
+      const hits = [...line.matchAll(/(?:https?:\/\/)?t\.me\/nft\/([A-Za-z0-9_-]+-\d+)/gi)];
+      hits.forEach((hit, i) => {
+        const serial = hit[1];
+        if (!order.includes(serial)) order.push(serial);
+        const tail = line.slice(hit.index! + hit[0].length, hits[i + 1]?.index ?? line.length);
+        const num = tail.match(/^[\s\-–—:,;|=]*(\d+(?:[ \u00a0]\d{3})*(?:[.,]\d{1,2})?)(?![\d])/);
+        if (num) { const value = Number(num[1].replace(/[ \u00a0]/g, '').replace(',', '.')); if (Number.isFinite(value) && value > 0) priceMap.set(serial, value); }
+      });
+    }
+    const found = order;
+    const withPrice = (serial: string) => `https://t.me/nft/${serial}${priceMap.has(serial) ? ' ' + priceMap.get(serial) : ''}`;
     if (!found.length) { setBatchReport(lang === 'RU' ? 'Ссылки на подарки не найдены.' : 'No gift links found.'); return; }
     const chunk = found.slice(0, 25), rest = found.slice(25);
     setBatchBusy(true); setBatchReport('');
@@ -353,7 +367,7 @@ function App() {
       const items = good.map(r => {
         const m = r.serial.match(/^(.*)-(\d+)$/)!;
         const slug = m[1].toLowerCase().replace(/[^a-z0-9]/g, '');
-        return { id: r.serial.toLowerCase().replace(/[^a-z0-9_-]/g, ''), collection: r.collection || titleFromGiftSlug(m[1]), number: Number(m[2]), model: r.model, modelRarity: r.modelRarity, backdrop: r.backdrop, backdropRarity: r.backdropRarity, symbol: r.symbol, symbolRarity: r.symbolRarity, image: `https://nft.fragment.com/gift/${slug}-${m[2]}.webp`, source: `https://t.me/nft/${r.serial}`, serial: r.serial, price: batchPrice.trim() ? Number(batchPrice) : undefined };
+        return { id: r.serial.toLowerCase().replace(/[^a-z0-9_-]/g, ''), collection: r.collection || titleFromGiftSlug(m[1]), number: Number(m[2]), model: r.model, modelRarity: r.modelRarity, backdrop: r.backdrop, backdropRarity: r.backdropRarity, symbol: r.symbol, symbolRarity: r.symbolRarity, image: `https://nft.fragment.com/gift/${slug}-${m[2]}.webp`, source: `https://t.me/nft/${r.serial}`, serial: r.serial, price: priceMap.get(r.serial) ?? (batchPrice.trim() ? Number(batchPrice) : undefined) };
       });
       if (items.length) {
         await adminPost('/api/catalog', { action: 'import', items });
@@ -362,7 +376,7 @@ function App() {
       }
       const bad = results.filter(r => !r.ok);
       setBatchReport((lang === 'RU' ? `Добавлено: ${items.length}. Не удалось: ${bad.length}.` : `Added: ${items.length}. Failed: ${bad.length}.`) + (bad.length ? '\n' + bad.map(b => `${b.serial} — ${b.error}`).join('\n') : '') + (rest.length ? (lang === 'RU' ? `\nОсталось в списке: ${rest.length} (нажмите ещё раз).` : `\nRemaining: ${rest.length} (press again).`) : ''));
-      setBatchText([...bad.map(b => `https://t.me/nft/${b.serial}`), ...rest.map(r => `https://t.me/nft/${r}`)].join('\n'));
+      setBatchText([...bad.map(b => withPrice(b.serial)), ...rest.map(withPrice)].join('\n'));
       showToast(`${t.added}: ${items.length}`);
     } catch (error) { setBatchReport(error instanceof Error ? error.message : 'Error'); }
     setBatchBusy(false);
@@ -659,8 +673,8 @@ function App() {
         <div className="admin-tools"><button type="button" onClick={migrateLocalData}><Upload size={15}/>{t.importLocal}</button></div>
         <section className="admin-form panel">
           <h2><Gift size={19}/>{lang === 'RU' ? 'Добавить пачкой' : 'Bulk add gifts'}</h2>
-          <label>{lang === 'RU' ? 'Ссылки на подарки (по одной на строку, до 25 за раз)' : 'Gift links (one per line, up to 25 at a time)'}<textarea rows={5} value={batchText} onChange={e => setBatchText(e.target.value)} placeholder={'https://t.me/nft/JellyBunny-12779\nhttps://t.me/nft/PlushPepe-96'}/></label>
-          <label>{lang === 'RU' ? 'Цена для всех, ₽ (необязательно)' : 'Price for all, ₽ (optional)'}<input type="number" min="0" step="any" value={batchPrice} onChange={e => setBatchPrice(e.target.value)} placeholder="1500"/></label>
+          <label>{lang === 'RU' ? 'Ссылки на подарки, цена в ₽ через пробел после ссылки (по одной на строку, до 25 за раз)' : 'Gift links with the ₽ price after a space (one per line, up to 25 at a time)'}<textarea rows={5} value={batchText} onChange={e => setBatchText(e.target.value)} placeholder={'https://t.me/nft/MoodPack-112928 1900\nhttps://t.me/nft/IceCream-145403 780'}/></label>
+          <label>{lang === 'RU' ? 'Цена для строк без цены, ₽ (необязательно)' : 'Price for lines without one, ₽ (optional)'}<input type="number" min="0" step="any" value={batchPrice} onChange={e => setBatchPrice(e.target.value)} placeholder="1500"/></label>
           <button className="primary-btn admin-submit" type="button" disabled={batchBusy || !batchText.trim()} onClick={addBatch}><Plus size={17}/>{batchBusy ? (lang === 'RU' ? 'Загружаю…' : 'Loading…') : (lang === 'RU' ? 'Добавить все' : 'Add all')}</button>
           {batchReport && <p className="admin-hint" style={{ whiteSpace: 'pre-line' }}>{batchReport}</p>}
         </section>

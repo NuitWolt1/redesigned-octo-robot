@@ -105,7 +105,7 @@ body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),t
 .admin-mini{width:34px;height:34px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--blue);display:grid;place-items:center;transition:transform .3s var(--spring)}
 .admin-mini:active{transform:scale(.88)}
 .hist{margin-top:18px}.hist h3{display:flex;align-items:center;gap:10px;margin:0 0 6px;font-size:19px;font-weight:900;letter-spacing:-.4px}
-.hist h3:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,#f5a524,transparent)}
+.hist h3:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--blue),transparent)}
 .hist p{margin:0;color:var(--muted);font-size:13px}
 .wd-card{margin-top:18px;padding:16px;border-radius:24px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(60,100,255,.16),rgba(20,30,70,.08));display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow)}
 .wd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
