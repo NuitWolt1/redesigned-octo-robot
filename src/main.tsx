@@ -7,6 +7,7 @@ import {
   ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star
 } from 'lucide-react';
 import './style.css';
+import './design.css';
 
 type Tab = 'games' | 'market' | 'reviews' | 'gifts' | 'event' | 'profile' | 'admin';
 type Lang = 'EN' | 'RU';
