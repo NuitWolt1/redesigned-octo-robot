@@ -570,7 +570,7 @@ function App() {
               <div className="user-data"><h2>{fullName || telegramUser.username || `ID ${telegramUser.id}`}</h2><b>{telegramUser.username ? `@${telegramUser.username}` : (lang === 'EN' ? 'Username not set' : 'Имя пользователя не задано')}</b><small>TELEGRAM ID&nbsp; {telegramUser.id}</small></div>
             </div>
             <div className="profile-stats">
-              <div><small>{t.balance}</small><b>{fmt(stats.balance)}</b></div><div><small>{t.spent}</small><b>{fmt(stats.spent)}</b></div>
+              <div><small>{t.balance}</small><b>{fmt(stats.balance)} ₽</b></div><div><small>{t.spent}</small><b>{fmt(stats.spent)}</b></div>
               <div><small>{t.purchases}</small><b>{fmt(stats.purchases)}</b></div>
               <div className="language-stat"><small>{t.language}</small><button onClick={() => setLang(lang === 'EN' ? 'RU' : 'EN')}>{lang}<ChevronDown size={15}/></button></div>
             </div>
