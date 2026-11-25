@@ -4,11 +4,11 @@ import {
   Gamepad2, Gift, LockKeyhole, Sparkles, UserRound, Search, ChevronDown,
   Gem, TrendingUp, Activity, Wallet, ShoppingBag, ArrowUpRight, X,
   ExternalLink, ShieldCheck, Moon, Sun, ArrowLeft, Plus, Trash2,
-  ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2
+  ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star
 } from 'lucide-react';
 import './style.css';
 
-type Tab = 'games' | 'market' | 'gifts' | 'event' | 'profile' | 'admin';
+type Tab = 'games' | 'market' | 'reviews' | 'gifts' | 'event' | 'profile' | 'admin';
 type Lang = 'EN' | 'RU';
 type Sort = 'featured' | 'low' | 'high';
 type Theme = 'light' | 'dark';
@@ -20,6 +20,13 @@ type TelegramUser = {
   language_code?: string;
   photo_url?: string;
   is_premium?: boolean;
+};
+type ReviewItem = {
+  id: string;
+  username: string;
+  rating: number;
+  text: string;
+  createdAt: number;
 };
 type GiftItem = {
   id: string;
@@ -54,6 +61,7 @@ declare global {
 
 const STORAGE_KEY = 'playerok.catalog.v3';
 const THEME_KEY = 'playerok.theme.v2';
+const REVIEWS_STORAGE_KEY = 'playerok.reviews.v1';
 const botUrl = 'https://t.me/Playerok_Guarantor_Bot';
 
 // Коллекционные подарки Telegram. Все изображения ведут на публичные NFT-превью Fragment.
@@ -98,6 +106,7 @@ const initialGifts: GiftItem[] = [
 const nav: { id: Exclude<Tab, 'admin'>; label: string; ru: string; icon: typeof Gamepad2 }[] = [
   { id: 'games', label: 'Games', ru: 'Игры', icon: Gamepad2 },
   { id: 'market', label: 'Market', ru: 'Маркет', icon: Gift },
+  { id: 'reviews', label: 'Reviews', ru: 'Отзывы', icon: MessageSquare },
   { id: 'gifts', label: 'My gifts', ru: 'Мои подарки', icon: LockKeyhole },
   { id: 'event', label: 'Event', ru: 'События', icon: Sparkles },
   { id: 'profile', label: 'Profile', ru: 'Профиль', icon: UserRound }
@@ -112,13 +121,18 @@ const copy = {
     fundSub: 'Deposits and withdrawals are currently unavailable.', search: 'Search gifts', featured: 'Featured',
     low: 'Lowest number', high: 'Highest number', listed: 'GIFTS IN CATALOG', floor: 'LOWEST NUMBER', volume: 'COLLECTIONS',
     openNumbers: 'Gift numbers', openDeals: 'Gift collections', unavailable: 'Unavailable', retry: 'Retry',
-    offers: 'Offers', history: 'History', empty: 'Items could not be loaded. Try again later.', marketButton: 'Go to market',
+    offers: 'Offers', history: 'History', marketButton: 'Go to market',
+    noPersonalGifts: 'You do not have any gifts yet.', noOffers: 'You do not have any offers yet.', noHistory: 'Your purchase history is empty.',
+    reviews: 'Reviews', reviewsSub: 'Feedback from Playerok users', noReviews: 'No reviews yet', noReviewsSub: 'Reviews will appear here.', reviewCount: 'REVIEWS', averageRating: 'AVERAGE RATING',
+    addReview: 'Add a review', reviewUsername: 'Username / nickname', reviewRating: 'Rating', reviewText: 'Review text', saveReview: 'Publish review',
+    reviewAdded: 'Review added', reviewRemoved: 'Review removed', invalidReview: 'Enter a nickname and review text, then choose 1–5 stars.',
+    adminReviews: 'Manage reviews', reviewList: 'Published reviews',
     model: 'MODEL', backdrop: 'BACKGROUND', symbol: 'PATTERN', collection: 'COLLECTION',
     bot: 'Open Telegram bot', gamesInfo: 'This section is currently empty.',
     telegramConnect: 'Open this app from Telegram to show your profile.', connect: 'Open Telegram bot',
     account: 'TELEGRAM ACCOUNT', connected: 'Telegram profile connected', notConnected: 'Telegram profile not found',
     premium: 'TELEGRAM PREMIUM', admin: 'Manage catalog', adminTitle: 'Admin panel', adminSub: 'Add and remove collectible gifts from the catalog.', adminDenied: 'Administrator access is required.',
-    localOnly: 'Changes are saved in this browser only. To publish one shared catalog for all visitors, connect a database.',
+    localOnly: 'Gifts and reviews are saved in this browser only. To show the same catalog and reviews to every visitor, connect a shared database.',
     addGift: 'Add a gift', collectionName: 'Gift collection', number: 'Gift number', modelName: 'Model', modelRarity: 'Model rarity',
     background: 'Background', backgroundRarity: 'Background rarity', pattern: 'Pattern', patternRarity: 'Pattern rarity',
     imageUrl: 'Custom image URL (optional)', nftUrl: 'Paste Telegram NFT link', imageHint: 'Just paste a Telegram NFT link, for example https://t.me/nft/JellyBunny-12779. Collection, number and gift image will fill in automatically — no image URL needed.', imagePreview: 'Image preview',
@@ -136,13 +150,18 @@ const copy = {
     fundSub: 'Пополнение и вывод средств пока недоступны.', search: 'Поиск подарков', featured: 'Рекомендуемые',
     low: 'Сначала меньший номер', high: 'Сначала больший номер', listed: 'ПОДАРКОВ В КАТАЛОГЕ', floor: 'МИНИМАЛЬНЫЙ НОМЕР', volume: 'КОЛЛЕКЦИИ',
     openNumbers: 'Номера подарков', openDeals: 'Коллекции подарков', unavailable: 'Недоступно', retry: 'Повторить',
-    offers: 'Предложения', history: 'История', empty: 'Не удалось загрузить данные. Попробуйте позже.', marketButton: 'Перейти в маркет',
+    offers: 'Предложения', history: 'История', marketButton: 'Перейти в маркет',
+    noPersonalGifts: 'У вас пока нет подарков.', noOffers: 'Пока нет предложений.', noHistory: 'История покупок пока пуста.',
+    reviews: 'Отзывы', reviewsSub: 'Отзывы пользователей Playerok', noReviews: 'Отзывов пока нет', noReviewsSub: 'Здесь будут опубликованы отзывы.', reviewCount: 'ОТЗЫВОВ', averageRating: 'СРЕДНЯЯ ОЦЕНКА',
+    addReview: 'Добавить отзыв', reviewUsername: 'Имя пользователя / ник', reviewRating: 'Оценка', reviewText: 'Текст отзыва', saveReview: 'Опубликовать отзыв',
+    reviewAdded: 'Отзыв добавлен', reviewRemoved: 'Отзыв удалён', invalidReview: 'Укажи ник, текст отзыва и оценку от 1 до 5 звёзд.',
+    adminReviews: 'Управление отзывами', reviewList: 'Опубликованные отзывы',
     model: 'МОДЕЛЬ', backdrop: 'ФОН', symbol: 'УЗОР', collection: 'КОЛЛЕКЦИЯ',
     bot: 'Открыть Telegram-бота', gamesInfo: 'Раздел пока пуст.',
     telegramConnect: 'Открой приложение через Telegram, чтобы увидеть свой профиль.', connect: 'Открыть Telegram-бота',
     account: 'АККАУНТ TELEGRAM', connected: 'Профиль Telegram подключён', notConnected: 'Профиль Telegram не найден',
     premium: 'TELEGRAM PREMIUM', admin: 'Управление каталогом', adminTitle: 'Панель администратора', adminSub: 'Добавление и удаление коллекционных подарков.', adminDenied: 'Доступ разрешён только администраторам.',
-    localOnly: 'Изменения сохраняются только в этом браузере. Для единого каталога у всех посетителей подключи базу данных.',
+    localOnly: 'Подарки и отзывы сохраняются только в этом браузере. Чтобы каталог и отзывы были одинаковыми у всех посетителей, подключи общую базу данных.',
     addGift: 'Добавить подарок', collectionName: 'Коллекция подарка', number: 'Номер подарка', modelName: 'Модель', modelRarity: 'Редкость модели',
     background: 'Фон', backgroundRarity: 'Редкость фона', pattern: 'Узор', patternRarity: 'Редкость узора',
     imageUrl: 'Своя ссылка на изображение (необязательно)', nftUrl: 'Вставь ссылку на Telegram NFT', imageHint: 'Просто вставь ссылку на подарок, например https://t.me/nft/JellyBunny-12779. Коллекция, номер и изображение заполнятся автоматически — искать ссылку на картинку не нужно.', imagePreview: 'Предпросмотр изображения',
@@ -164,6 +183,27 @@ function loadCatalog(): GiftItem[] {
     console.warn('Could not read the saved catalog:', error);
   }
   return initialGifts;
+}
+
+function loadReviews(): ReviewItem[] {
+  try {
+    const stored = localStorage.getItem(REVIEWS_STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is ReviewItem => Boolean(
+        item && typeof item === 'object' &&
+        typeof (item as ReviewItem).id === 'string' &&
+        typeof (item as ReviewItem).username === 'string' &&
+        Number.isInteger((item as ReviewItem).rating) &&
+        (item as ReviewItem).rating >= 1 && (item as ReviewItem).rating <= 5 &&
+        typeof (item as ReviewItem).text === 'string'
+      ));
+    }
+  } catch (error) {
+    console.warn('Could not read saved reviews:', error);
+  }
+  return [];
 }
 
 function getTelegramUser(): TelegramUser | null {
@@ -219,6 +259,8 @@ function App() {
   const [sub, setSub] = useState<'gifts' | 'offers' | 'history'>('gifts');
   const [langOpen, setLangOpen] = useState(false);
   const [catalog, setCatalog] = useState<GiftItem[]>(loadCatalog);
+  const [reviews, setReviews] = useState<ReviewItem[]>(loadReviews);
+  const [reviewForm, setReviewForm] = useState({ username: '', rating: 5, text: '' });
   const [toast, setToast] = useState('');
   const [giftForm, setGiftForm] = useState({
     collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '',
@@ -265,6 +307,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(catalog));
   }, [catalog]);
+
+  useEffect(() => {
+    localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(reviews));
+  }, [reviews]);
 
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme);
@@ -353,6 +399,27 @@ function App() {
     };
     reader.readAsText(file);
   };
+  const addReview = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAdmin) { showToast(t.adminDenied); return; }
+    const username = reviewForm.username.trim();
+    const text = reviewForm.text.trim();
+    if (!username || !text || !Number.isInteger(reviewForm.rating) || reviewForm.rating < 1 || reviewForm.rating > 5) {
+      showToast(t.invalidReview); return;
+    }
+    const item: ReviewItem = {
+      id: `review-${Date.now()}`, username, rating: reviewForm.rating, text, createdAt: Date.now()
+    };
+    setReviews(old => [item, ...old]);
+    setReviewForm({ username: '', rating: 5, text: '' });
+    showToast(t.reviewAdded);
+  };
+  const deleteReview = (id: string) => {
+    if (!isAdmin) { showToast(t.adminDenied); return; }
+    setReviews(old => old.filter(review => review.id !== id));
+    showToast(t.reviewRemoved);
+  };
+  const averageRating = reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : 0;
   const fullName = telegramUser ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ') : '';
   const initials = fullName ? fullName.slice(0, 1).toUpperCase() : 'P';
 
@@ -442,7 +509,22 @@ function App() {
           <button className={sub === 'offers' ? 'selected' : ''} onClick={() => setSub('offers')}>{t.offers}</button>
           <button className={sub === 'history' ? 'selected' : ''} onClick={() => setSub('history')}>{t.history}</button>
         </div>
-        <div className="error-box">{t.empty}</div><button className="retry-btn" disabled>{t.retry}</button>
+        <div className="personal-empty panel">
+          <div className="personal-empty-icon"><Gift size={23}/></div>
+          <h3>{sub === 'gifts' ? t.noPersonalGifts : sub === 'offers' ? t.noOffers : t.noHistory}</h3>
+        </div>
+      </section>}
+
+      {tab === 'reviews' && <section className="reviews-page">
+        <div className="page-heading panel"><div><span className="eyebrow">PLAYEROK COMMUNITY</span><h1>{t.reviews}</h1><p>{t.reviewsSub}</p></div><div className="heading-icon"><MessageSquare size={22}/></div></div>
+        <div className="reviews-summary panel">
+          <div className="review-score"><strong>{reviews.length ? averageRating.toFixed(1) : '—'}</strong><div><div className="review-stars">{[1,2,3,4,5].map(star => <Star key={star} size={16} fill={star <= Math.round(averageRating) ? 'currentColor' : 'none'}/>)}</div><small>{reviews.length} {t.reviewCount.toLowerCase()}</small></div></div>
+          <div className="review-summary-label">{t.averageRating}</div>
+        </div>
+        {reviews.length ? <div className="reviews-list">{reviews.map(review => <article className="review-card panel" key={review.id}>
+          <div className="review-card-head"><div className="review-avatar">{review.username.trim().slice(0,1).toUpperCase()}</div><div className="review-author"><b>{review.username}</b><small>{new Date(review.createdAt).toLocaleDateString(lang === 'RU' ? 'ru-RU' : 'en-US')}</small></div><div className="review-card-stars" aria-label={`${review.rating} / 5`}>{[1,2,3,4,5].map(star => <Star key={star} size={14} fill={star <= review.rating ? 'currentColor' : 'none'}/>)}</div></div>
+          <p>{review.text}</p>
+        </article>)}</div> : <div className="reviews-empty panel"><div className="reviews-empty-icon"><MessageSquare size={24}/></div><h3>{t.noReviews}</h3><p>{t.noReviewsSub}</p></div>}
       </section>}
 
       {tab === 'event' && <section className="empty-hero panel"><div className="hero-icon"><Sparkles size={29}/></div><span className="section-kicker">PLAYEROK EVENTS</span><h1>{t.event}</h1><p>{t.eventSub}</p><button className="primary-btn" disabled>{t.unavailable}</button></section>}
@@ -491,6 +573,18 @@ function App() {
           <div className="admin-list-title"><h2>{t.catalogList}</h2><span className="count-pill">{catalog.length}</span></div>
           <div className="admin-tools"><button onClick={exportCatalog}><Upload size={15}/>Export JSON</button><label className="import-button"><ImagePlus size={15}/>Import JSON<input type="file" accept="application/json,.json" onChange={e => { importCatalog(e.target.files?.[0]); e.currentTarget.value = ''; }}/></label></div>
           {catalog.map(g => <div className="admin-gift-row" key={g.id}><img src={g.image} alt=""/><span><b>{g.collection} #{g.number}</b><small>{g.model} · {g.backdrop} · {g.symbol}</small></span><button aria-label={`${t.delete} ${g.collection} ${g.number}`} onClick={() => deleteGift(g.id)}><Trash2 size={16}/></button></div>)}
+        </section>
+        <form className="admin-form panel review-admin-form" onSubmit={addReview}>
+          <h2><MessageSquare size={19}/>{t.addReview}</h2>
+          <label>{t.reviewUsername}<input required maxLength={40} value={reviewForm.username} onChange={e => setReviewForm(old => ({ ...old, username: e.target.value }))} placeholder={lang === 'RU' ? 'Например, Alex' : 'For example, Alex'}/></label>
+          <div className="admin-rating-field"><span>{t.reviewRating}</span><div className="admin-rating-picker" role="radiogroup" aria-label={t.reviewRating}>{[1,2,3,4,5].map(star => <button key={star} type="button" role="radio" aria-checked={reviewForm.rating === star} aria-label={`${star} / 5`} className={star <= reviewForm.rating ? 'rating-star selected' : 'rating-star'} onClick={() => setReviewForm(old => ({ ...old, rating: star }))}><Star size={25} fill={star <= reviewForm.rating ? 'currentColor' : 'none'}/></button>)}</div></div>
+          <label>{t.reviewText}<textarea required maxLength={900} rows={4} value={reviewForm.text} onChange={e => setReviewForm(old => ({ ...old, text: e.target.value }))} placeholder={lang === 'RU' ? 'Напиши текст отзыва…' : 'Write the review…'}/></label>
+          <button className="primary-btn admin-submit" type="submit"><Plus size={17}/>{t.saveReview}</button>
+        </form>
+        <section className="admin-list panel">
+          <div className="admin-list-title"><h2>{t.reviewList}</h2><span className="count-pill">{reviews.length}</span></div>
+          {reviews.map(review => <div className="admin-review-row" key={review.id}><span className="admin-review-copy"><b>{review.username} · {review.rating}/5 ★</b><small>{review.text}</small></span><button aria-label={`${t.delete} ${review.username}`} onClick={() => deleteReview(review.id)}><Trash2 size={16}/></button></div>)}
+          {!reviews.length && <p className="admin-empty-note">{t.noReviews}</p>}
         </section>
       </section>}
     </main>
