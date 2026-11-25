@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { readRequestBody, verifyAdminInitData } from '../server/admin';
-import { databaseIsConfigured, databaseRequest } from '../server/supabase';
+import { readRequestBody, verifyAdminInitData } from '../server/admin.js';
+import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
 
 type GiftInput = {
   id: string; collection: string; number: number; model: string; modelRarity: string;

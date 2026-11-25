@@ -87,3 +87,8 @@ body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),t
 .bottom-nav{position:fixed!important;bottom:14px;z-index:9999!important;contain:layout paint;-webkit-transform:translateX(-50%);transform:translateX(-50%)!important}.toast{z-index:10000}
 .gift-card{contain:layout style}
 @media(max-width:390px){.bottom-nav{bottom:9px}}
+
+/* Liquid Glass: преломление фона (Chromium). На iPhone/Safari — обычное стекло */
+.lg .bottom-nav{backdrop-filter:blur(2px) url(#liquid) saturate(180%) brightness(1.08);-webkit-backdrop-filter:blur(2px) url(#liquid) saturate(180%) brightness(1.08)}
+.lg .bottom-nav{background:linear-gradient(135deg,rgba(255,255,255,.28),rgba(255,255,255,.06))}
+:root[data-theme=dark].lg .bottom-nav,.lg[data-theme=dark] .bottom-nav{background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.02))}

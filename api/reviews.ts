@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { readRequestBody, verifyAdminInitData } from '../server/admin';
-import { databaseIsConfigured, databaseRequest } from '../server/supabase';
+import { readRequestBody, verifyAdminInitData } from '../server/admin.js';
+import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
 
 type ReviewRow = { id: string; username: string; rating: number; review_text: string; created_at: string };
 function safeText(value: unknown, max: number): string {

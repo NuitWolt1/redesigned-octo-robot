@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { readRequestBody, verifyAdminInitData } from '../server/admin';
+import { readRequestBody, verifyAdminInitData } from '../server/admin.js';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
