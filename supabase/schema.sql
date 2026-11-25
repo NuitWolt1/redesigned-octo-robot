@@ -49,3 +49,16 @@ values
 on conflict (id) do nothing;
 
 notify pgrst, 'reload schema';
+
+-- Balance / spent / purchases per Telegram user (default 0, changed only by admins via /api/stats).
+create table if not exists public.user_stats (
+  telegram_id text primary key check (telegram_id ~ '^[0-9]{1,15}$'),
+  balance numeric(14,2) not null default 0 check (balance >= 0),
+  spent numeric(14,2) not null default 0 check (spent >= 0),
+  purchases integer not null default 0 check (purchases >= 0),
+  updated_at timestamptz not null default now()
+);
+alter table public.user_stats enable row level security;
+revoke all on table public.user_stats from anon, authenticated;
+grant select, insert, update, delete on table public.user_stats to service_role;
+notify pgrst, 'reload schema';

@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import {
-  Gamepad2, Gift, LockKeyhole, Sparkles, UserRound, Search, ChevronDown,
-  Gem, TrendingUp, Activity, Wallet, ShoppingBag, ArrowUpRight, X,
-  ExternalLink, ShieldCheck, Moon, Sun, ArrowLeft, Plus, Trash2,
-  ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star
+  createRoot } from 'react-dom/client';
+import {
+  Gamepad2, Gift, LockKeyhole, Sparkles, UserRound, Search, ChevronDown, Gem, TrendingUp, Activity, Wallet, ShoppingBag, ArrowUpRight, X, ExternalLink, ShieldCheck, Moon, Sun, ArrowLeft, Plus, Trash2, ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star, CreditCard, Phone, Banknote, RefreshCw
 } from 'lucide-react';
 import './style.css';
 import './design.css';
@@ -87,7 +85,7 @@ const copy = {
     offers: 'Offers', history: 'History', marketButton: 'Go to market',
     noPersonalGifts: 'You do not have any gifts yet.', noOffers: 'You do not have any offers yet.', noHistory: 'Your purchase history is empty.',
     reviews: 'Reviews', reviewsSub: 'Feedback from Playerok users', noReviews: 'No reviews yet', noReviewsSub: 'Reviews will appear here.', reviewCount: 'REVIEWS', averageRating: 'AVERAGE RATING',
-    addReview: 'Add a review', reviewUsername: 'Username / nickname', reviewRating: 'Rating', reviewText: 'Review text', saveReview: 'Publish review',
+    addReview: 'Add a review', reviewDate: 'Review date and time', statsTitle: 'User balance', userId: 'Telegram ID', modeAdd: 'Add', modeSet: 'Set', statsSave: 'Apply', statsDone: 'Saved', statsInvalid: 'Check the ID and values.', reviewUsername: 'Username / nickname', reviewRating: 'Rating', reviewText: 'Review text', saveReview: 'Publish review',
     reviewAdded: 'Review added', reviewRemoved: 'Review removed', invalidReview: 'Enter a nickname and review text, then choose 1–5 stars.',
     adminReviews: 'Manage reviews', reviewList: 'Published reviews',
     model: 'MODEL', backdrop: 'BACKGROUND', symbol: 'PATTERN', collection: 'COLLECTION',
@@ -118,7 +116,7 @@ const copy = {
     offers: 'Предложения', history: 'История', marketButton: 'Перейти в маркет',
     noPersonalGifts: 'У вас пока нет подарков.', noOffers: 'Пока нет предложений.', noHistory: 'История покупок пока пуста.',
     reviews: 'Отзывы', reviewsSub: 'Отзывы пользователей Playerok', noReviews: 'Отзывов пока нет', noReviewsSub: 'Здесь будут опубликованы отзывы.', reviewCount: 'ОТЗЫВОВ', averageRating: 'СРЕДНЯЯ ОЦЕНКА',
-    addReview: 'Добавить отзыв', reviewUsername: 'Имя пользователя / ник', reviewRating: 'Оценка', reviewText: 'Текст отзыва', saveReview: 'Опубликовать отзыв',
+    addReview: 'Добавить отзыв', reviewDate: 'Дата и время отзыва', statsTitle: 'Баланс пользователя', userId: 'Telegram ID', modeAdd: 'Добавить', modeSet: 'Установить', statsSave: 'Применить', statsDone: 'Сохранено', statsInvalid: 'Проверьте ID и значения.', reviewUsername: 'Имя пользователя / ник', reviewRating: 'Оценка', reviewText: 'Текст отзыва', saveReview: 'Опубликовать отзыв',
     reviewAdded: 'Отзыв добавлен', reviewRemoved: 'Отзыв удалён', invalidReview: 'Укажи ник, текст отзыва и оценку от 1 до 5 звёзд.',
     adminReviews: 'Управление отзывами', reviewList: 'Опубликованные отзывы',
     model: 'МОДЕЛЬ', backdrop: 'ФОН', symbol: 'УЗОР', collection: 'КОЛЛЕКЦИЯ',
@@ -216,7 +214,11 @@ function App() {
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [databaseReady, setDatabaseReady] = useState(false);
   const [databaseError, setDatabaseError] = useState('');
-  const [reviewForm, setReviewForm] = useState({ username: '', rating: 5, text: '' });
+  const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+  const [reviewForm, setReviewForm] = useState({ username: '', rating: 5, text: '', date: nowLocal() });
+  const [wdMethod, setWdMethod] = useState<'card' | 'phone'>('card');
+  const [stats, setStats] = useState({ balance: 0, spent: 0, purchases: 0 });
+  const [statsForm, setStatsForm] = useState({ telegramId: '', mode: 'add', balance: '', spent: '', purchases: '' });
   const [toast, setToast] = useState('');
   const [giftForm, setGiftForm] = useState({
     collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '',
@@ -385,6 +387,27 @@ function App() {
     };
     reader.readAsText(file);
   };
+  const fmt = (n: number) => new Intl.NumberFormat(lang === 'RU' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 2 }).format(n);
+  useEffect(() => {
+    const initData = window.Telegram?.WebApp?.initData;
+    if (!initData) return;
+    let active = true;
+    const load = () => fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'me', initData }) })
+      .then(r => r.ok ? r.json() : null).then(d => { if (active && d) setStats({ balance: Number(d.balance) || 0, spent: Number(d.spent) || 0, purchases: Number(d.purchases) || 0 }); }).catch(() => {});
+    void load();
+    const timer = window.setInterval(load, 20000);
+    window.addEventListener('focus', load);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', load); };
+  }, [telegramUser?.id]);
+  const saveStats = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAdmin) { showToast(t.adminDenied); return; }
+    try {
+      await adminPost('/api/stats', { action: 'adjust', ...statsForm });
+      setStatsForm(old => ({ ...old, balance: '', spent: '', purchases: '' }));
+      showToast(t.statsDone);
+    } catch (error) { showToast(error instanceof Error ? error.message : t.statsInvalid); }
+  };
   const addReview = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isAdmin) { showToast(t.adminDenied); return; }
@@ -393,11 +416,11 @@ function App() {
     if (!username || !text || !Number.isInteger(reviewForm.rating) || reviewForm.rating < 1 || reviewForm.rating > 5) {
       showToast(t.invalidReview); return;
     }
-    const item: ReviewItem = { id: `review-${Date.now()}`, username, rating: reviewForm.rating, text, createdAt: Date.now() };
+    const item: ReviewItem = { id: `review-${Date.now()}`, username, rating: reviewForm.rating, text, createdAt: Number.isFinite(new Date(reviewForm.date).getTime()) ? new Date(reviewForm.date).getTime() : Date.now() };
     try {
       const result = await adminPost<{ item: ReviewItem }>('/api/reviews', { action: 'create', review: item });
-      setReviews(old => [result.item, ...old.filter(review => review.id !== result.item.id)]);
-      setReviewForm({ username: '', rating: 5, text: '' });
+      setReviews(old => [result.item, ...old.filter(review => review.id !== result.item.id)].sort((a, b) => b.createdAt - a.createdAt));
+      setReviewForm({ username: '', rating: 5, text: '', date: nowLocal() });
       showToast(t.reviewAdded);
     } catch (error) { showToast(error instanceof Error ? error.message : t.invalidReview); }
   };
@@ -538,7 +561,7 @@ function App() {
 
       {tab === 'profile' && <section className="profile-page">
         <div className="profile-card panel">
-          <div className="profile-head"><div><span className="eyebrow">{t.account}</span><h1>{t.profile}</h1></div><div className="heading-icon"><Wallet size={22}/></div></div>
+          <div className="profile-head"><div><span className="eyebrow">{t.account}</span><h1>{t.profile}</h1></div><div className="head-right">{isAdmin && <button className="admin-mini" aria-label={t.admin} title={t.admin} onClick={() => go('admin')}><ShieldCheck size={16}/></button>}<div className="heading-icon"><Wallet size={22}/></div></div></div>
           {telegramUser ? <>
             <div className="telegram-status connected"><CheckCircle2 size={15}/>{t.connected}</div>
             <div className="user-row">
@@ -547,17 +570,27 @@ function App() {
               <div className="user-data"><h2>{fullName || telegramUser.username || `ID ${telegramUser.id}`}</h2><b>{telegramUser.username ? `@${telegramUser.username}` : (lang === 'EN' ? 'Username not set' : 'Имя пользователя не задано')}</b><small>TELEGRAM ID&nbsp; {telegramUser.id}</small></div>
             </div>
             <div className="profile-stats">
-              <div><small>{t.balance}</small><b>—</b></div><div><small>{t.spent}</small><b>—</b></div>
-              <div><small>{t.purchases}</small><b>—</b></div>
+              <div><small>{t.balance}</small><b>{fmt(stats.balance)}</b></div><div><small>{t.spent}</small><b>{fmt(stats.spent)}</b></div>
+              <div><small>{t.purchases}</small><b>{fmt(stats.purchases)}</b></div>
               <div className="language-stat"><small>{t.language}</small><button onClick={() => setLang(lang === 'EN' ? 'RU' : 'EN')}>{lang}<ChevronDown size={15}/></button></div>
             </div>
             {telegramUser.is_premium && <div className="premium-chip"><Gem size={14}/>{t.premium}</div>}
           </> : <div className="telegram-connect">
             <div className="connect-icon"><UserRoundCheck size={26}/></div><h3>{t.notConnected}</h3><p>{t.telegramConnect}</p><a className="primary-btn connect-button" href={botUrl} target="_blank" rel="noreferrer">{t.connect} <ExternalLink size={14}/></a>
           </div>}
-          <div className="funds-box"><h3>{t.add}</h3><p>{t.fundSub}</p><div className="fund-actions"><button disabled>＋ Deposit</button><button disabled>↗ Withdraw</button></div></div>
+          <div className="hist"><h3>{lang === 'RU' ? 'История покупок' : 'Purchase history'}</h3><p>{lang === 'RU' ? 'Покупок пока нет.' : 'No purchases yet.'}</p></div>
+          <div className="hist"><h3>{lang === 'RU' ? 'История операций' : 'Transaction history'}</h3><p>{lang === 'RU' ? 'Операций пока нет.' : 'No transactions yet.'}</p></div>
+          <div className="wd-card" aria-disabled="true">
+            <div className="wd-head"><div><span className="wd-kicker">{lang === 'RU' ? 'ВЫВОД В РУБЛЯХ' : 'WITHDRAW IN RUB'}</span><h3>{lang === 'RU' ? 'Вывести в рублях' : 'Withdraw in rubles'}</h3><small>{lang === 'RU' ? 'Пока недоступно' : 'Currently unavailable'}</small></div><div className="wd-icon"><Banknote size={20}/></div></div>
+            <div className="wd-tabs"><button type="button" className={wdMethod === 'card' ? 'on' : ''} onClick={() => setWdMethod('card')}><CreditCard size={14}/>{lang === 'RU' ? 'Банковская карта' : 'Bank card'}</button><button type="button" className={wdMethod === 'phone' ? 'on' : ''} onClick={() => setWdMethod('phone')}><Phone size={14}/>{lang === 'RU' ? 'По номеру телефона' : 'By phone number'}</button></div>
+            <div className="wd-field wd-select"><span>{lang === 'RU' ? 'Сбербанк' : 'Sberbank'}</span><ChevronDown size={15}/></div>
+            <input className="wd-field" disabled placeholder={wdMethod === 'card' ? (lang === 'RU' ? 'Номер карты' : 'Card number') : (lang === 'RU' ? 'Номер телефона' : 'Phone number')}/>
+            <div className="wd-row"><input className="wd-field" disabled placeholder="0"/><button type="button" className="wd-all" disabled>{lang === 'RU' ? 'ВСЁ' : 'MAX'}</button></div>
+            <div className="wd-receive"><div><small>{lang === 'RU' ? 'ВЫ ПОЛУЧИТЕ' : 'YOU RECEIVE'}</small><b>0 ₽</b></div><span className="wd-refresh"><RefreshCw size={16}/></span></div>
+            <button type="button" className="wd-submit" disabled><Banknote size={16}/>{lang === 'RU' ? 'Пока недоступно' : 'Currently unavailable'}</button>
+            <p className="wd-note">{lang === 'RU' ? 'Вывод средств временно недоступен.' : 'Withdrawals are temporarily unavailable.'}</p>
+          </div>
           <a className="bot-card-link" href={botUrl} target="_blank" rel="noreferrer"><span className="bot-avatar"><ShieldCheck size={19}/></span><span><b>@Playerok_Guarantor_Bot</b><small>{t.bot}</small></span><ExternalLink size={15}/></a>
-          {isAdmin && <button className="admin-entry" onClick={() => go('admin')}><ShieldCheck size={17}/>{t.admin}<ArrowUpRight size={15}/></button>}
         </div>
       </section>}
 
@@ -582,10 +615,22 @@ function App() {
           <div className="admin-tools"><button onClick={exportCatalog}><Upload size={15}/>Export JSON</button><label className="import-button"><ImagePlus size={15}/>Import JSON<input type="file" accept="application/json,.json" onChange={e => { importCatalog(e.target.files?.[0]); e.currentTarget.value = ''; }}/></label></div>
           {catalog.map(g => <div className="admin-gift-row" key={g.id}><img src={g.image} alt=""/><span><b>{g.collection} #{g.number}</b><small>{g.model} · {g.backdrop} · {g.symbol}</small></span><button aria-label={`${t.delete} ${g.collection} ${g.number}`} onClick={() => deleteGift(g.id)}><Trash2 size={16}/></button></div>)}
         </section>
+        <form className="admin-form panel review-admin-form" onSubmit={saveStats}>
+          <h2><Wallet size={19}/>{t.statsTitle}</h2>
+          <label>{t.userId}<input required inputMode="numeric" pattern="[0-9]{1,15}" value={statsForm.telegramId} onChange={e => setStatsForm(old => ({ ...old, telegramId: e.target.value.trim() }))} placeholder="123456789"/></label>
+          <div className="admin-rating-field"><div className="admin-rating-picker">{(['add', 'set'] as const).map(m => <button key={m} type="button" className={statsForm.mode === m ? 'rating-star selected' : 'rating-star'} style={{ width: 'auto', padding: '0 14px' }} onClick={() => setStatsForm(old => ({ ...old, mode: m }))}>{m === 'add' ? t.modeAdd : t.modeSet}</button>)}</div></div>
+          <div className="admin-field-row">
+            <label>{t.balance}<input type="number" step="any" value={statsForm.balance} onChange={e => setStatsForm(old => ({ ...old, balance: e.target.value }))} placeholder="0"/></label>
+            <label>{t.spent}<input type="number" step="any" value={statsForm.spent} onChange={e => setStatsForm(old => ({ ...old, spent: e.target.value }))} placeholder="0"/></label>
+            <label>{t.purchases}<input type="number" step="1" value={statsForm.purchases} onChange={e => setStatsForm(old => ({ ...old, purchases: e.target.value }))} placeholder="0"/></label>
+          </div>
+          <button className="primary-btn admin-submit" type="submit"><Plus size={17}/>{t.statsSave}</button>
+        </form>
         <form className="admin-form panel review-admin-form" onSubmit={addReview}>
           <h2><MessageSquare size={19}/>{t.addReview}</h2>
           <label>{t.reviewUsername}<input required maxLength={40} value={reviewForm.username} onChange={e => setReviewForm(old => ({ ...old, username: e.target.value }))} placeholder={lang === 'RU' ? 'Например, Alex' : 'For example, Alex'}/></label>
           <div className="admin-rating-field"><span>{t.reviewRating}</span><div className="admin-rating-picker" role="radiogroup" aria-label={t.reviewRating}>{[1,2,3,4,5].map(star => <button key={star} type="button" role="radio" aria-checked={reviewForm.rating === star} aria-label={`${star} / 5`} className={star <= reviewForm.rating ? 'rating-star selected' : 'rating-star'} onClick={() => setReviewForm(old => ({ ...old, rating: star }))}><Star size={25} fill={star <= reviewForm.rating ? 'currentColor' : 'none'}/></button>)}</div></div>
+          <label>{t.reviewDate}<input type="datetime-local" required value={reviewForm.date} onChange={e => setReviewForm(old => ({ ...old, date: e.target.value }))}/></label>
           <label>{t.reviewText}<textarea required maxLength={900} rows={4} value={reviewForm.text} onChange={e => setReviewForm(old => ({ ...old, text: e.target.value }))} placeholder={lang === 'RU' ? 'Напиши текст отзыва…' : 'Write the review…'}/></label>
           <button className="primary-btn admin-submit" type="submit"><Plus size={17}/>{t.saveReview}</button>
         </form>

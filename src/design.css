@@ -88,7 +88,39 @@ body{background:radial-gradient(60vmax 50vmax at 10% -10%,rgba(80,120,255,.28),t
 .gift-card{contain:layout style}
 @media(max-width:390px){.bottom-nav{bottom:9px}}
 
-/* Liquid Glass: преломление фона (Chromium). На iPhone/Safari — обычное стекло */
-.lg .bottom-nav{backdrop-filter:blur(2px) url(#liquid) saturate(180%) brightness(1.08);-webkit-backdrop-filter:blur(2px) url(#liquid) saturate(180%) brightness(1.08)}
-.lg .bottom-nav{background:linear-gradient(135deg,rgba(255,255,255,.28),rgba(255,255,255,.06))}
-:root[data-theme=dark].lg .bottom-nav,.lg[data-theme=dark] .bottom-nav{background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.02))}
+/* Liquid Glass: преломляются только края, центр чистый (Chromium); на iPhone — обычное стекло */
+.lg .bottom-nav{backdrop-filter:blur(1.5px) url(#liquid) saturate(170%) brightness(1.05);-webkit-backdrop-filter:blur(1.5px) url(#liquid) saturate(170%) brightness(1.05);background:rgba(255,255,255,.34)}
+.lg[data-theme=dark] .bottom-nav{background:rgba(24,28,44,.4)}
+/* читаемые иконки на любом фоне */
+.bottom-nav{background-color:rgba(255,255,255,.3)}
+.nav-item{color:#33425f}
+.nav-item svg,.nav-item span{filter:drop-shadow(0 1px 1.5px rgba(255,255,255,.85))}
+:root[data-theme=dark] .nav-item{color:#dbe4fa}
+:root[data-theme=dark] .nav-item svg,:root[data-theme=dark] .nav-item span{filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+.nav-item.active{color:var(--blue-dark)}
+:root[data-theme=dark] .nav-item.active{color:#a9c1ff}
+
+/* ===== Профиль: вывод в рублях, истории, мини-кнопка админа ===== */
+.head-right{display:flex;align-items:center;gap:8px}
+.admin-mini{width:34px;height:34px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--blue);display:grid;place-items:center;transition:transform .3s var(--spring)}
+.admin-mini:active{transform:scale(.88)}
+.hist{margin-top:18px}.hist h3{display:flex;align-items:center;gap:10px;margin:0 0 6px;font-size:19px;font-weight:900;letter-spacing:-.4px}
+.hist h3:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,#f5a524,transparent)}
+.hist p{margin:0;color:var(--muted);font-size:13px}
+.wd-card{margin-top:18px;padding:16px;border-radius:24px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(60,100,255,.16),rgba(20,30,70,.08));display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow)}
+.wd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.wd-head h3{margin:4px 0 2px;font-size:21px;font-weight:900;letter-spacing:-.5px}.wd-head small{color:var(--muted);font-size:11px}
+.wd-kicker{font-size:9px;font-weight:900;letter-spacing:2px;color:var(--blue)}
+.wd-icon{width:44px;height:44px;border-radius:15px;border:1px solid var(--line);background:var(--surface-2);display:grid;place-items:center;color:var(--blue);flex:none}
+.wd-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:18px;border:1px solid var(--line);background:var(--surface-2)}
+.wd-tabs button{border:0;border-radius:14px;padding:11px 6px;background:transparent;color:var(--muted);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .35s var(--spring)}
+.wd-tabs button.on{background:#ffae2e;color:#2a1c00;box-shadow:0 6px 16px rgba(255,174,46,.4)}
+.wd-field{width:100%;min-height:50px;border-radius:16px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:0 14px;font-size:14px;font-weight:700;opacity:.75}
+.wd-select{display:flex;align-items:center;justify-content:space-between}
+.wd-row{display:grid;grid-template-columns:1fr 78px;gap:10px}
+.wd-all{border-radius:16px;border:1px solid var(--line);background:var(--soft-blue);color:var(--blue);font-weight:900;font-size:12px;opacity:.75}
+.wd-receive{display:flex;justify-content:space-between;align-items:center;padding:14px;border-radius:18px;border:1px solid var(--line);background:var(--surface-2)}
+.wd-receive small{display:block;font-size:9px;font-weight:900;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px}.wd-receive b{font-size:26px;font-weight:900}
+.wd-refresh{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);color:var(--muted)}
+.wd-submit{border:0;border-radius:16px;min-height:50px;font-weight:800;font-size:14px;color:#fff;background:var(--grad);display:flex;align-items:center;justify-content:center;gap:8px;opacity:.5}
+.wd-note{margin:0;text-align:center;font-size:10.5px;color:var(--muted)}

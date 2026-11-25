@@ -12,7 +12,7 @@ function getConfig() {
 }
 
 export async function databaseRequest<T>(
-  table: 'market_gifts' | 'reviews',
+  table: 'market_gifts' | 'reviews' | 'user_stats',
   query: URLSearchParams,
   method: 'GET' | 'POST' | 'DELETE',
   payload?: unknown,

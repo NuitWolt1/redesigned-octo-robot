@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const normalizeReview = (input: unknown) => {
-      const review = input as { id?: unknown; username?: unknown; rating?: unknown; text?: unknown } | undefined;
+      const review = input as { id?: unknown; username?: unknown; rating?: unknown; text?: unknown; createdAt?: unknown } | undefined;
       if (!review) throw new Error('Invalid review details.');
       const id = safeText(review.id, 100);
       const username = safeText(review.username, 40);
@@ -51,7 +51,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!/^[a-zA-Z0-9_-]+$/.test(id) || !username || !text || !Number.isInteger(rating) || rating < 1 || rating > 5) {
         throw new Error('Invalid review details.');
       }
-      return { id, username, rating, review_text: text };
+      const ts = Number(review.createdAt);
+      const validDate = Number.isFinite(ts) && ts > 1.4e12 && ts < Date.now() + 48 * 3600 * 1000;
+      return { id, username, rating, review_text: text, ...(validDate ? { created_at: new Date(ts).toISOString() } : {}) };
     };
     const query = new URLSearchParams({ select: '*' });
     if (body.action === 'import') {

@@ -5,6 +5,11 @@ const ADMIN_IDS = new Set(['8491418744', '9264762756']);
 type TelegramUser = { id?: number };
 
 export function verifyAdminInitData(initData: string): { id: string } | null {
+  const user = verifyTelegramInitData(initData);
+  return user && ADMIN_IDS.has(user.id) ? user : null;
+}
+
+export function verifyTelegramInitData(initData: string): { id: string } | null {
   const botToken = process.env.BOT_TOKEN;
   if (!botToken || !initData || initData.length > 8192) return null;
 
@@ -34,7 +39,7 @@ export function verifyAdminInitData(initData: string): { id: string } | null {
     if (typeof user.id !== 'number' || !Number.isSafeInteger(user.id)) return null;
 
     const id = String(user.id);
-    return ADMIN_IDS.has(id) ? { id } : null;
+    return { id };
   } catch {
     return null;
   }
