@@ -195,7 +195,10 @@ async function adminPost<T>(path: string, payload: Record<string, unknown>): Pro
 }
 
 function App() {
-  const [tab, setTab] = useState<Tab>('market');
+  const [tab, setTab] = useState<Tab>(() => {
+    const wanted = new URLSearchParams(window.location.search).get('tab');
+    return (['games', 'market', 'reviews', 'gifts', 'event', 'profile'] as Tab[]).find(id => id === wanted) ?? 'market';
+  });
   const [lang, setLang] = useState<Lang>(() => {
     const tgLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code?.toLowerCase();
     return tgLang?.startsWith('ru') ? 'RU' : 'EN';
