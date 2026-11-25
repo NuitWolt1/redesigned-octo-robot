@@ -224,6 +224,10 @@ function App() {
   const [databaseError, setDatabaseError] = useState('');
   const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   const [reviewForm, setReviewForm] = useState({ username: '', rating: 5, text: '', date: nowLocal() });
+  const [minWait, setMinWait] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [imagesReady, setImagesReady] = useState(false);
+  const [splashGone, setSplashGone] = useState(false);
   const [batchText, setBatchText] = useState('');
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchPrice, setBatchPrice] = useState('');
@@ -295,7 +299,7 @@ function App() {
         setDatabaseError(error instanceof Error ? error.message : 'Shared database is unavailable.');
       }
     };
-    void refreshSharedData();
+    void refreshSharedData().finally(() => setDataLoaded(true));
     const interval = window.setInterval(refreshSharedData, 20000);
     window.addEventListener('focus', refreshSharedData);
     return () => {
@@ -460,6 +464,25 @@ function App() {
     };
     reader.readAsText(file);
   };
+  // Стартовая загрузка: минимум 3 секунды, пока придут данные и прогрузятся картинки (но не дольше 7 секунд).
+  useEffect(() => {
+    const a = window.setTimeout(() => setMinWait(true), 3000);
+    const b = window.setTimeout(() => { setDataLoaded(true); setImagesReady(true); }, 7000);
+    return () => { window.clearTimeout(a); window.clearTimeout(b); };
+  }, []);
+  useEffect(() => {
+    if (!dataLoaded || imagesReady) return;
+    let live = true;
+    const loads = catalog.slice(0, 24).map(g => new Promise<void>(resolve => { const img = new Image(); img.onload = img.onerror = () => resolve(); img.src = g.image; }));
+    Promise.race([Promise.all(loads), new Promise(resolve => window.setTimeout(resolve, 2500))]).then(() => { if (live) setImagesReady(true); });
+    return () => { live = false; };
+  }, [dataLoaded, catalog, imagesReady]);
+  const splashVisible = !(minWait && dataLoaded && imagesReady);
+  useEffect(() => {
+    if (splashVisible) return;
+    const id = window.setTimeout(() => setSplashGone(true), 600);
+    return () => window.clearTimeout(id);
+  }, [splashVisible]);
   const fmt = (n: number) => new Intl.NumberFormat(lang === 'RU' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 2 }).format(n);
   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
@@ -730,6 +753,15 @@ function App() {
       <a href={botUrl} target="_blank" rel="noreferrer">@Playerok_Guarantor_Bot <ExternalLink size={11}/></a>
       <span>Playerok</span>
     </footer>
+    {!splashGone && <div className={splashVisible ? 'splash' : 'splash out'} aria-hidden="true">
+      <div className="splash-mark">
+        <svg className="splash-ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" className="splash-track"/><circle cx="50" cy="50" r="46" className="splash-arc"/></svg>
+        <img src="/playerok-symbol.png" alt=""/>
+      </div>
+      <b className="splash-name">PLAYEROK</b>
+      <div className="splash-status"><span>{lang === 'RU' ? 'Подключаемся' : 'Connecting'}</span><span>{lang === 'RU' ? 'Загружаем подарки' : 'Loading gifts'}</span><span>{lang === 'RU' ? 'Почти готово' : 'Almost ready'}</span></div>
+      <div className="splash-bar"><i/></div>
+    </div>}
     {buyGift && <div className="modal-back" onClick={() => setBuyGift(null)}><div className="modal-card" role="dialog" onClick={e => e.stopPropagation()}>
       <button className="modal-x" aria-label="Close" onClick={() => setBuyGift(null)}><X size={16}/></button>
       <div className="modal-icon"><Wallet size={24}/></div>
