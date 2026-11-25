@@ -51,6 +51,7 @@ declare global {
         initDataUnsafe?: { user?: TelegramUser };
         ready?: () => void;
         expand?: () => void;
+        openTelegramLink?: (url: string) => void;
         colorScheme?: 'light' | 'dark';
         setHeaderColor?: (color: string) => void;
         setBackgroundColor?: (color: string) => void;
@@ -178,6 +179,13 @@ function parseGiftLink(value: string): { collection: string; number: string; slu
 
 type GiftLookup = { serial: string; ok: boolean; error?: string; collection?: string; model?: string; modelRarity?: string; backdrop?: string; backdropRarity?: string; symbol?: string; symbolRarity?: string };
 const lookupGifts = (serials: string[]) => adminPost<{ results: GiftLookup[] }>('/api/gift-lookup', { serials }).then(r => r.results);
+
+// Открывает подарок в самом Telegram (нативно); вне Telegram — обычная ссылка.
+function openGift(url: string) {
+  const app = window.Telegram?.WebApp;
+  if (app?.openTelegramLink && /^https:\/\/t\.me\//i.test(url)) app.openTelegramLink(url);
+  else window.open(url, '_blank', 'noopener');
+}
 
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(path, { method: 'GET', cache: 'no-store' });
@@ -608,7 +616,7 @@ function App() {
             <button className={sort === 'high' ? 'active' : ''} onClick={() => setSort('high')}>{t.high}</button>
           </div>
           <div className="gift-grid">
-            {filtered.map(g => <article className="gift-card" key={g.id}>
+            {filtered.map(g => <article className="gift-card" key={g.id} role="button" tabIndex={0} onClick={() => openGift(g.source)} onKeyDown={e => { if (e.key === 'Enter') openGift(g.source); }}>
               <div className="gift-art"><img src={g.image} alt={`${g.collection} #${g.number}`} loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement?.classList.add('image-error'); }}/>
                 <span className="serial-ribbon">#{g.number.toLocaleString('en-US')}</span>
               </div>
@@ -619,7 +627,7 @@ function App() {
                   <div className="attribute"><small>{t.backdrop}</small><b><i className={`backdrop-dot ${g.backdrop.toLowerCase().replace(/ /g, '-')}`}/>{g.backdrop}</b><em>{g.backdropRarity}</em></div>
                   <div className="attribute"><small>{t.symbol}</small><b>{g.symbol}</b><em>{g.symbolRarity}</em></div>
                 </div>
-                <div className="gift-card-bottom"><a href={g.source} target="_blank" rel="noreferrer">{t.openNft} <ExternalLink size={12}/></a>{g.price != null ? <button type="button" className="buy-btn" onClick={() => buyNow(g)}><ShoppingBag size={14}/>{fmt(g.price)} ₽</button> : <span className="unavailable"><ShoppingBag size={14}/>{t.unavailable}</span>}</div>
+                <div className="gift-card-bottom"><a href={g.source} target="_blank" rel="noreferrer" onClick={e => { e.preventDefault(); e.stopPropagation(); openGift(g.source); }}>{t.openNft} <ExternalLink size={12}/></a>{g.price != null ? <button type="button" className="buy-btn" onClick={e => { e.stopPropagation(); buyNow(g); }}><ShoppingBag size={14}/>{fmt(g.price)} ₽</button> : <span className="unavailable"><ShoppingBag size={14}/>{t.unavailable}</span>}</div>
               </div>
             </article>)}
           </div>

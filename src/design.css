@@ -168,3 +168,5 @@ img{-webkit-user-drag:none;user-drag:none}
 @keyframes splashStat{0%{opacity:0;transform:translateY(5px)}18%,82%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-5px)}}
 @keyframes splashStatLast{0%{opacity:0;transform:translateY(5px)}18%,100%{opacity:1;transform:none}}
 @keyframes splashBar{0%{width:0}12%{width:19%}24%{width:27%}44%{width:58%}58%{width:63%}80%{width:91%}100%{width:100%}}
+
+.gift-card{cursor:pointer}
