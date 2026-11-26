@@ -108,3 +108,25 @@ alter table public.app_settings enable row level security;
 revoke all on table public.app_settings from anon, authenticated;
 grant select, insert, update, delete on table public.app_settings to service_role;
 notify pgrst, 'reload schema';
+
+-- "My gifts": gifts credited to a user after they send them to the manager; the owner can list them for sale.
+alter table public.market_gifts add column if not exists seller_id text;
+create table if not exists public.user_gifts (
+  id uuid primary key default gen_random_uuid(),
+  telegram_id text not null check (telegram_id ~ '^[0-9]{1,15}$'),
+  serial text not null unique,
+  collection text not null,
+  gift_number integer not null,
+  model text not null, model_rarity text not null default '—',
+  backdrop text not null, backdrop_rarity text not null default '—',
+  symbol text not null, symbol_rarity text not null default '—',
+  image text not null,
+  source text not null,
+  price_rub numeric(12,2) check (price_rub is null or price_rub > 0),
+  created_at timestamptz not null default now()
+);
+create index if not exists user_gifts_user_idx on public.user_gifts (telegram_id, created_at desc);
+alter table public.user_gifts enable row level security;
+revoke all on table public.user_gifts from anon, authenticated;
+grant select, insert, update, delete on table public.user_gifts to service_role;
+notify pgrst, 'reload schema';

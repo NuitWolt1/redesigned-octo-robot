@@ -238,3 +238,17 @@ img{-webkit-user-drag:none;user-drag:none}
 .buy-btn{border-radius:999px;padding:8px 14px;font-size:13px}
 .catalog-title h2{letter-spacing:-.6px}
 .eyebrow{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--soft-blue);color:var(--blue);font-weight:800}
+
+/* ===== Мои подарки ===== */
+.deposit{display:flex;flex-direction:column;gap:12px;padding:16px}
+.deposit b{font-size:16px;font-weight:900}.deposit p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+.deposit-ico{width:42px;height:42px;border-radius:14px;background:var(--soft-blue);color:var(--blue);display:grid;place-items:center}
+.deposit .primary-btn{text-decoration:none;justify-content:center}
+.mg-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.mg-card{border-radius:20px;border:1px solid var(--line);background:var(--surface);padding:8px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow)}
+.mg-art{position:relative;border:0;padding:0;border-radius:14px;overflow:hidden;aspect-ratio:1/1;background:var(--soft-blue)}.mg-art img{width:100%;height:100%;object-fit:cover}
+.mg-badge{position:absolute;left:6px;bottom:6px;background:rgba(15,20,40,.72);color:#fff;border-radius:999px;padding:4px 9px;font-size:10.5px;font-weight:800;backdrop-filter:blur(8px)}
+.mg-info{display:flex;flex-direction:column;padding:0 4px}.mg-info b{font-size:13px;font-weight:900}.mg-info small{color:var(--muted);font-size:11px}
+.mg-actions,.mg-sell{display:flex;gap:6px;align-items:center}.mg-actions .buy-btn{flex:1;justify-content:center;font-size:12px;padding:8px 6px}
+.mg-ghost,.mg-x{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:7px 10px;font-size:12px;font-weight:800;display:grid;place-items:center}
+.mg-sell input{min-width:0;flex:1;min-height:36px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:0 10px;font-weight:700}

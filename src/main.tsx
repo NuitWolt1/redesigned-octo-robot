@@ -42,7 +42,9 @@ type GiftItem = {
   source: string;
   serial: string;
   price?: number | null;
+  sellerId?: string | null;
 };
+type MyGift = Omit<GiftItem, 'id' | 'createdAt'> & { id: string; price: number | null };
 
 declare global {
   interface Window {
@@ -258,6 +260,10 @@ function App() {
   const [fRarity, setFRarity] = useState(0);
   const [fOnSale, setFOnSale] = useState(false);
   const [pct, setPct] = useState(0);
+  const [myGifts, setMyGifts] = useState<MyGift[]>([]);
+  const [sell, setSell] = useState<{ id: string; price: string } | null>(null);
+  const [ugForm, setUgForm] = useState({ telegramId: '', links: '' });
+  const [ugList, setUgList] = useState<MyGift[]>([]);
   const [wd, setWd] = useState({ bank: 'Сбербанк', req: '', amount: '', result: 'idle' as 'idle' | 'ok' | 'low' });
   const [toast, setToast] = useState('');
   const [giftForm, setGiftForm] = useState({
@@ -453,6 +459,7 @@ function App() {
   };
   const buyNow = (g: GiftItem) => {
     if (g.price == null) return;
+    if (g.sellerId && telegramUser && String(telegramUser.id) === g.sellerId) { showToast(lang === 'RU' ? 'Это ваш подарок' : 'This is your gift'); return; }
     if (stats.balance < g.price) { setBuyGift(g); return; }
     showToast(lang === 'RU' ? 'Покупка пока недоступна' : 'Purchase is not available yet');
   };
@@ -559,6 +566,47 @@ function App() {
     if (id.length < 8) return;
     fetch('/api/device', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: app.initData, deviceId: id, info: { platform: app.platform, version: app.version, screen: `${window.screen.width}x${window.screen.height}`, lang: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } }) }).catch(() => {});
   }, []);
+  const userPost = async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
+    const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, initData: window.Telegram?.WebApp?.initData || '' }) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Request failed');
+    return data as T;
+  };
+  useEffect(() => {
+    if (!window.Telegram?.WebApp?.initData) return;
+    let active = true;
+    const load = () => userPost<{ items: MyGift[] }>('/api/mygifts', { action: 'me' }).then(d => { if (active) setMyGifts(d.items); }).catch(() => {});
+    void load();
+    const timer = window.setInterval(load, 20000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [telegramUser?.id]);
+  const refreshCatalog = () => apiGet<{ items: GiftItem[] }>('/api/catalog').then(d => { if (Array.isArray(d.items)) setCatalog(d.items); }).catch(() => {});
+  const listMine = async (id: string) => {
+    try {
+      const r = await userPost<{ item: MyGift }>('/api/mygifts', { action: 'list_item', id, price: sell?.price });
+      setMyGifts(old => old.map(g => g.id === id ? r.item : g)); setSell(null); showToast(lang === 'RU' ? 'Выставлено на продажу' : 'Listed for sale'); void refreshCatalog();
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
+  };
+  const unlistMine = async (id: string) => {
+    try {
+      const r = await userPost<{ item: MyGift }>('/api/mygifts', { action: 'unlist', id });
+      setMyGifts(old => old.map(g => g.id === id ? r.item : g)); showToast(lang === 'RU' ? 'Снято с продажи' : 'Removed from sale'); void refreshCatalog();
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
+  };
+  const addUserGifts = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAdmin) { showToast(t.adminDenied); return; }
+    const links = [...new Set((ugForm.links.match(/(?:https?:\/\/)?t\.me\/nft\/([A-Za-z0-9_-]+-\d+)/gi) || []).map(l => l.split('/nft/')[1]))];
+    try {
+      const r = await adminPost<{ added: string[]; failed: { serial: string; error: string }[] }>('/api/mygifts', { action: 'add', telegramId: ugForm.telegramId, links });
+      showToast(`${lang === 'RU' ? 'Зачислено' : 'Credited'}: ${r.added.length}${r.failed.length ? ` · ${lang === 'RU' ? 'ошибок' : 'errors'}: ${r.failed.length}` : ''}`);
+      if (r.failed.length) setUgForm(old => ({ ...old, links: r.failed.map(f => `https://t.me/nft/${f.serial}`).join('\n') })); else setUgForm(old => ({ ...old, links: '' }));
+      const l = await adminPost<{ items: MyGift[] }>('/api/mygifts', { action: 'admin_list', telegramId: ugForm.telegramId }); setUgList(l.items);
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
+  };
+  const removeUserGift = async (id: string) => {
+    try { await adminPost('/api/mygifts', { action: 'remove', id }); setUgList(old => old.filter(g => g.id !== id)); } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
+  };
   // История покупок/операций и актуальный юзернейм менеджера.
   useEffect(() => {
     let active = true;
@@ -734,10 +782,22 @@ function App() {
           <button className={sub === 'offers' ? 'selected' : ''} onClick={() => setSub('offers')}>{t.offers}</button>
           <button className={sub === 'history' ? 'selected' : ''} onClick={() => setSub('history')}>{t.history}</button>
         </div>
-        <div className="personal-empty panel">
+        {sub === 'gifts' ? <>
+          <div className="deposit panel">
+            <div className="deposit-ico"><Gift size={20}/></div>
+            <div><b>{lang === 'RU' ? 'Пополнить подарки' : 'Deposit gifts'}</b><p>{lang === 'RU' ? `Отправьте подарок на @${manager.username}. После проверки он появится здесь, и вы сможете выставить его на продажу.` : `Send the gift to @${manager.username}. After a check it will appear here and you can list it for sale.`}</p></div>
+            <a className="primary-btn" href={manager.url} target="_blank" rel="noreferrer"><UserRound size={16}/>{lang === 'RU' ? 'Отправить подарок' : 'Send a gift'} @{manager.username}</a>
+          </div>
+          {myGifts.length === 0 ? <div className="personal-empty panel"><div className="personal-empty-icon"><Gift size={23}/></div><h3>{t.noPersonalGifts}</h3></div> : <div className="mg-grid">{myGifts.map(g => <article className="mg-card" key={g.id}>
+            <button type="button" className="mg-art" onClick={() => openGift(g.source)}><img src={g.image} alt={`${g.collection} #${g.number}`} loading="lazy"/>{g.price != null && <span className="mg-badge">{lang === 'RU' ? 'В продаже' : 'For sale'} · {fmt(g.price)} ₽</span>}</button>
+            <div className="mg-info"><b>{g.collection} #{g.number}</b><small>{g.model} · {g.backdrop}</small></div>
+            {sell?.id === g.id ? <div className="mg-sell"><input type="number" inputMode="decimal" min="0" autoFocus value={sell.price} onChange={e => setSell({ id: g.id, price: e.target.value })} placeholder={lang === 'RU' ? 'Цена, ₽' : 'Price, ₽'}/><button type="button" className="buy-btn" onClick={() => listMine(g.id)}>{lang === 'RU' ? 'Выставить' : 'List'}</button><button type="button" className="mg-x" aria-label="Cancel" onClick={() => setSell(null)}><X size={15}/></button></div>
+              : <div className="mg-actions"><button type="button" className="buy-btn" onClick={() => setSell({ id: g.id, price: g.price != null ? String(g.price) : '' })}>{g.price != null ? (lang === 'RU' ? 'Изменить цену' : 'Change price') : (lang === 'RU' ? 'Выставить на продажу' : 'List for sale')}</button>{g.price != null && <button type="button" className="mg-ghost" onClick={() => unlistMine(g.id)}>{lang === 'RU' ? 'Снять' : 'Remove'}</button>}</div>}
+          </article>)}</div>}
+        </> : <div className="personal-empty panel">
           <div className="personal-empty-icon"><Gift size={23}/></div>
-          <h3>{sub === 'gifts' ? t.noPersonalGifts : sub === 'offers' ? t.noOffers : t.noHistory}</h3>
-        </div>
+          <h3>{sub === 'offers' ? t.noOffers : t.noHistory}</h3>
+        </div>}
       </section>}
 
       {tab === 'reviews' && <section className="reviews-page">
@@ -821,6 +881,13 @@ function App() {
           <div className="admin-tools"><button onClick={exportCatalog}><Upload size={15}/>Export JSON</button><label className="import-button"><ImagePlus size={15}/>Import JSON<input type="file" accept="application/json,.json" onChange={e => { importCatalog(e.target.files?.[0]); e.currentTarget.value = ''; }}/></label></div>
           {catalog.map(g => <div className="admin-gift-row" key={g.id}><img src={g.image} alt=""/><span><b>{g.collection} #{g.number}</b><small>{g.model} · {g.backdrop} · {g.symbol}</small><span className="price-edit"><input type="number" min="0" step="any" placeholder={lang === 'RU' ? 'Цена ₽' : 'Price ₽'} value={priceEdits[g.id] ?? (g.price ?? '')} onChange={e => setPriceEdits(old => ({ ...old, [g.id]: e.target.value }))}/><button type="button" aria-label="Save price" onClick={() => savePrice(g.id)}><CheckCircle2 size={15}/></button></span></span><button aria-label={`${t.delete} ${g.collection} ${g.number}`} onClick={() => deleteGift(g.id)}><Trash2 size={16}/></button></div>)}
         </section>
+        <form className="admin-form panel review-admin-form" onSubmit={addUserGifts}>
+          <h2><Gift size={19}/>{lang === 'RU' ? 'Зачислить подарок пользователю' : 'Credit a gift to a user'}</h2>
+          <label>{t.userId}<input required inputMode="numeric" pattern="[0-9]{1,15}" value={ugForm.telegramId} onChange={e => setUgForm(old => ({ ...old, telegramId: e.target.value.trim() }))} placeholder="123456789"/></label>
+          <label>{lang === 'RU' ? 'Ссылки на подарки (по одной на строку, до 10)' : 'Gift links (one per line, up to 10)'}<textarea rows={3} required value={ugForm.links} onChange={e => setUgForm(old => ({ ...old, links: e.target.value }))} placeholder="https://t.me/nft/MoodPack-112928"/></label>
+          <button className="primary-btn admin-submit" type="submit"><Plus size={17}/>{lang === 'RU' ? 'Зачислить' : 'Credit'}</button>
+          {ugList.map(g => <div className="admin-hist-row" key={g.id}><span><b>{g.collection} #{g.number}</b><small>{g.price != null ? `${fmt(g.price)} ₽` : (lang === 'RU' ? 'не в продаже' : 'not for sale')}</small></span><button type="button" aria-label="Delete" onClick={() => removeUserGift(g.id)}><Trash2 size={15}/></button></div>)}
+        </form>
         <form className="admin-form panel review-admin-form" onSubmit={saveHistory}>
           <h2><ShoppingBag size={19}/>{lang === 'RU' ? 'История пользователя' : 'User history'}</h2>
           <label>{t.userId}<input required inputMode="numeric" pattern="[0-9]{1,15}" value={histForm.telegramId} onChange={e => setHistForm(old => ({ ...old, telegramId: e.target.value.trim() }))} placeholder="123456789"/></label>

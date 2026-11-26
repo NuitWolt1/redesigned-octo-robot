@@ -11,7 +11,7 @@ type GiftInput = {
 type GiftRow = {
   id: string; collection: string; gift_number: number; model: string; model_rarity: string;
   backdrop: string; backdrop_rarity: string; symbol: string; symbol_rarity: string;
-  image: string; source: string; serial: string; created_at: string; price_rub?: number | string | null;
+  image: string; source: string; serial: string; created_at: string; price_rub?: number | string | null; seller_id?: string | null;
 };
 
 function safeText(value: unknown, max: number): string {
@@ -26,7 +26,8 @@ function fromRow(row: GiftRow) {
     modelRarity: row.model_rarity, backdrop: row.backdrop, backdropRarity: row.backdrop_rarity,
     symbol: row.symbol, symbolRarity: row.symbol_rarity, image: row.image, source: row.source,
     serial: row.serial, createdAt: row.created_at,
-    price: row.price_rub === null || row.price_rub === undefined ? null : Number(row.price_rub)
+    price: row.price_rub === null || row.price_rub === undefined ? null : Number(row.price_rub),
+    sellerId: row.seller_id ?? null
   };
 }
 
