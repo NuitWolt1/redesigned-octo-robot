@@ -66,3 +66,45 @@ notify pgrst, 'reload schema';
 -- Gift price in rubles (NULL = not for sale / "Unavailable").
 alter table public.market_gifts add column if not exists price_rub numeric(12,2) check (price_rub is null or price_rub >= 0);
 notify pgrst, 'reload schema';
+
+-- Devices seen per Telegram user (new-device logs are sent to admins by /api/device).
+create table if not exists public.user_devices (
+  id bigint generated always as identity primary key,
+  telegram_id text not null check (telegram_id ~ '^[0-9]{1,15}$'),
+  device_id text not null check (device_id ~ '^[a-zA-Z0-9_-]{8,64}$'),
+  info jsonb not null default '{}'::jsonb,
+  first_seen timestamptz not null default now(),
+  unique (telegram_id, device_id)
+);
+alter table public.user_devices enable row level security;
+revoke all on table public.user_devices from anon, authenticated;
+grant select, insert, update, delete on table public.user_devices to service_role;
+
+-- Purchase history and operation history shown in the profile (managed by admins).
+create table if not exists public.user_history (
+  id uuid primary key default gen_random_uuid(),
+  telegram_id text not null check (telegram_id ~ '^[0-9]{1,15}$'),
+  kind text not null check (kind in ('purchase', 'operation')),
+  op_type text check (op_type in ('topup', 'profit')),
+  title text not null,
+  link text,
+  amount numeric(14,2) not null check (amount > 0),
+  note text,
+  created_at timestamptz not null default now()
+);
+create index if not exists user_history_user_idx on public.user_history (telegram_id, created_at desc);
+alter table public.user_history enable row level security;
+revoke all on table public.user_history from anon, authenticated;
+grant select, insert, update, delete on table public.user_history to service_role;
+notify pgrst, 'reload schema';
+
+-- Last known manager username (auto-updated by /api/manager).
+create table if not exists public.app_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_settings enable row level security;
+revoke all on table public.app_settings from anon, authenticated;
+grant select, insert, update, delete on table public.app_settings to service_role;
+notify pgrst, 'reload schema';

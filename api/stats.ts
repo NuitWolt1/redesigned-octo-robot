@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { readRequestBody, verifyAdminInitData, verifyTelegramInitData } from '../server/admin.js';
+import { isBotRequest, readRequestBody, verifyAdminInitData, verifyTelegramInitData } from '../server/admin.js';
 import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
 
 type StatsRow = { telegram_id: string; balance: number | string; spent: number | string; purchases: number | string };
@@ -32,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (body.action !== 'adjust') return res.status(400).json({ error: 'Unknown action.' });
-    if (!verifyAdminInitData(initData)) return res.status(403).json({ error: 'Administrator access required.' });
+    if (!isBotRequest(req.headers['x-bot-auth']) && !verifyAdminInitData(initData)) return res.status(403).json({ error: 'Administrator access required.' });
 
     const telegramId = String(body.telegramId ?? '').trim();
     if (!/^[0-9]{1,15}$/.test(telegramId)) return res.status(400).json({ error: 'Invalid Telegram ID.' });

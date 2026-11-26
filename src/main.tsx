@@ -2,14 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   createRoot } from 'react-dom/client';
 import {
-  Gamepad2, Gift, LockKeyhole, Sparkles, UserRound, Search, ChevronDown, Gem, TrendingUp, Activity, Wallet, ShoppingBag, ArrowUpRight, X, ExternalLink, ShieldCheck, Moon, Sun, ArrowLeft, Plus, Trash2, ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star, CreditCard, Phone, Banknote, RefreshCw
+  Gamepad2, Gift, LockKeyhole, Sparkles, UserRound, Search, ChevronDown, Gem, TrendingUp, Activity, Wallet, ShoppingBag, ArrowUpRight, X, ExternalLink, ShieldCheck, Moon, Sun, ArrowLeft, Plus, Trash2, ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star, CreditCard, Phone, Banknote, RefreshCw, SlidersHorizontal
 } from 'lucide-react';
 import './style.css';
 import './design.css';
 
 type Tab = 'games' | 'market' | 'reviews' | 'gifts' | 'event' | 'profile' | 'admin';
 type Lang = 'EN' | 'RU';
-type Sort = 'featured' | 'low' | 'high';
+type Sort = 'featured' | 'low' | 'high' | 'cheap' | 'expensive';
+type HistoryItem = { id: string; kind: 'purchase' | 'operation'; title: string; link: string | null; opType: 'topup' | 'profit' | null; amount: number; createdAt: number };
 type Theme = 'light' | 'dark';
 type TelegramUser = {
   id: number;
@@ -52,6 +53,8 @@ declare global {
         ready?: () => void;
         expand?: () => void;
         openTelegramLink?: (url: string) => void;
+        platform?: string;
+        version?: string;
         colorScheme?: 'light' | 'dark';
         setHeaderColor?: (color: string) => void;
         setBackgroundColor?: (color: string) => void;
@@ -245,6 +248,17 @@ function App() {
   const [wdMethod, setWdMethod] = useState<'card' | 'phone'>('card');
   const [stats, setStats] = useState({ balance: 0, spent: 0, purchases: 0 });
   const [statsForm, setStatsForm] = useState({ telegramId: '', mode: 'add', balance: '', spent: '', purchases: '' });
+  const [manager, setManager] = useState({ username: 'Mananger_Playerok', url: managerUrl });
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [adminHist, setAdminHist] = useState<HistoryItem[]>([]);
+  const [histForm, setHistForm] = useState({ telegramId: '', type: 'purchase', link: '', amount: '', date: nowLocal() });
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [fMin, setFMin] = useState('');
+  const [fMax, setFMax] = useState('');
+  const [fRarity, setFRarity] = useState(0);
+  const [fOnSale, setFOnSale] = useState(false);
+  const [pct, setPct] = useState(0);
+  const [wd, setWd] = useState({ bank: 'Сбербанк', req: '', amount: '', result: 'idle' as 'idle' | 'ok' | 'low' });
   const [toast, setToast] = useState('');
   const [giftForm, setGiftForm] = useState({
     collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '',
@@ -328,11 +342,21 @@ function App() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const rarityOf = (g: GiftItem) => Math.min(...[g.modelRarity, g.backdropRarity, g.symbolRarity].map(r => { const n = parseFloat(String(r).replace(',', '.')); return Number.isFinite(n) ? n : Infinity; }));
+    const min = fMin.trim() === '' ? null : Number(fMin), max = fMax.trim() === '' ? null : Number(fMax);
     let list = catalog.filter(g => [g.collection, g.number, g.model, g.backdrop, g.symbol].join(' ').toLowerCase().includes(q));
+    if (fOnSale || min !== null || max !== null || sort === 'cheap' || sort === 'expensive') list = list.filter(g => g.price != null);
+    if (min !== null && Number.isFinite(min)) list = list.filter(g => (g.price ?? 0) >= min);
+    if (max !== null && Number.isFinite(max)) list = list.filter(g => (g.price ?? 0) <= max);
+    if (fRarity > 0) list = list.filter(g => rarityOf(g) <= fRarity);
     if (sort === 'low') list = [...list].sort((a, b) => a.number - b.number);
     if (sort === 'high') list = [...list].sort((a, b) => b.number - a.number);
+    if (sort === 'cheap') list = [...list].sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+    if (sort === 'expensive') list = [...list].sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
     return list;
-  }, [catalog, query, sort]);
+  }, [catalog, query, sort, fMin, fMax, fRarity, fOnSale]);
+  const activeFilters = (fOnSale ? 1 : 0) + (fMin || fMax ? 1 : 0) + (fRarity ? 1 : 0) + (sort === 'cheap' || sort === 'expensive' ? 1 : 0);
+  const resetFilters = () => { setFMin(''); setFMax(''); setFRarity(0); setFOnSale(false); if (sort === 'cheap' || sort === 'expensive') setSort('featured'); };
 
   const go = (next: Tab) => {
     if (next === 'admin' && !isAdmin) { setTab('profile'); showToast(t.adminDenied); return; }
@@ -392,6 +416,31 @@ function App() {
       showToast(`${t.added}: ${items.length}`);
     } catch (error) { setBatchReport(error instanceof Error ? error.message : 'Error'); }
     setBatchBusy(false);
+  };
+  const saveHistory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAdmin) { showToast(t.adminDenied); return; }
+    const when = new Date(histForm.date).getTime();
+    try {
+      await adminPost('/api/history', { action: 'add', telegramId: histForm.telegramId, kind: histForm.type === 'purchase' ? 'purchase' : 'operation', opType: histForm.type === 'purchase' ? undefined : histForm.type, nftLink: histForm.link, amount: histForm.amount, createdAt: Number.isFinite(when) ? when : Date.now() });
+      setHistForm(old => ({ ...old, link: '', amount: '', date: nowLocal() }));
+      showToast(t.statsDone);
+      void loadAdminHist();
+    } catch (error) { showToast(error instanceof Error ? error.message : t.statsInvalid); }
+  };
+  const loadAdminHist = async () => {
+    if (!isAdmin || !histForm.telegramId) return;
+    try { const r = await adminPost<{ items: HistoryItem[] }>('/api/history', { action: 'list', telegramId: histForm.telegramId }); setAdminHist(r.items); }
+    catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
+  };
+  const deleteHistory = async (id: string) => {
+    try { await adminPost('/api/history', { action: 'delete', id }); setAdminHist(old => old.filter(h => h.id !== id)); }
+    catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
+  };
+  const submitWithdraw = () => {
+    const amount = Number(wd.amount.replace(',', '.'));
+    if (!(amount > 0) || wd.req.trim().length < 5) { showToast(lang === 'RU' ? 'Укажите реквизиты и сумму' : 'Enter details and amount'); return; }
+    setWd(old => ({ ...old, result: amount > stats.balance ? 'low' : 'ok' }));
   };
   const savePrice = async (id: string) => {
     if (!isAdmin) { showToast(t.adminDenied); return; }
@@ -487,10 +536,46 @@ function App() {
   }, [dataLoaded, catalog, imagesReady]);
   const splashVisible = !(minWait && dataLoaded && imagesReady);
   useEffect(() => {
+    if (!splashVisible) { setPct(100); return; }
+    const start = performance.now();
+    const pts: [number, number][] = [[0, 0], [.4, 18], [.8, 27], [1.4, 58], [1.9, 64], [2.6, 90], [3, 97], [8, 99]];
+    const id = window.setInterval(() => {
+      const sec = (performance.now() - start) / 1000;
+      let v = 99;
+      for (let i = 1; i < pts.length; i++) if (sec <= pts[i][0]) { const [t0, v0] = pts[i - 1], [t1, v1] = pts[i]; v = v0 + (v1 - v0) * ((sec - t0) / (t1 - t0)); break; }
+      setPct(old => Math.max(old, v));
+    }, 60);
+    return () => window.clearInterval(id);
+  }, [splashVisible]);
+  // Лог нового устройства уходит админам в Telegram (сервер сам решает, новое ли оно).
+  useEffect(() => {
+    const app = window.Telegram?.WebApp;
+    if (!app?.initData) return;
+    let id = '';
+    try {
+      id = localStorage.getItem('playerok.device') || '';
+      if (!id) { id = ((window.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36)) + '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40); localStorage.setItem('playerok.device', id); }
+    } catch { return; }
+    if (id.length < 8) return;
+    fetch('/api/device', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: app.initData, deviceId: id, info: { platform: app.platform, version: app.version, screen: `${window.screen.width}x${window.screen.height}`, lang: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } }) }).catch(() => {});
+  }, []);
+  // История покупок/операций и актуальный юзернейм менеджера.
+  useEffect(() => {
+    let active = true;
+    const initData = window.Telegram?.WebApp?.initData;
+    const loadHistory = () => { if (!initData) return; fetch('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'me', initData }) }).then(r => r.ok ? r.json() : null).then(d => { if (active && d && Array.isArray(d.items)) setHistory(d.items); }).catch(() => {}); };
+    const loadManager = () => fetch('/api/manager').then(r => r.ok ? r.json() : null).then(d => { if (active && d?.username) setManager({ username: d.username, url: `https://t.me/${d.username}` }); }).catch(() => {});
+    loadHistory(); loadManager();
+    const a = window.setInterval(loadHistory, 20000), b = window.setInterval(loadManager, 300000);
+    return () => { active = false; window.clearInterval(a); window.clearInterval(b); };
+  }, [telegramUser?.id]);
+  useEffect(() => {
     if (splashVisible) return;
     const id = window.setTimeout(() => setSplashGone(true), 600);
     return () => window.clearTimeout(id);
   }, [splashVisible]);
+  const dt = (ms: number) => new Date(ms).toLocaleString(lang === 'RU' ? 'ru-RU' : 'en-US', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const opLabel = (type: string | null) => type === 'profit' ? (lang === 'RU' ? 'Прибыль с продаж' : 'Sales profit') : (lang === 'RU' ? 'Пополнение через менеджера' : 'Top-up via manager');
   const fmt = (n: number) => new Intl.NumberFormat(lang === 'RU' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 2 }).format(n);
   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
@@ -610,6 +695,13 @@ function App() {
         <section className="catalog panel" id="catalog">
           <div className="catalog-title"><div><span className="eyebrow">COLLECTIBLES</span><h2>{lang === 'EN' ? 'Featured gifts' : 'Популярные подарки'}</h2></div><span className="count-pill">{filtered.length} {t.total}</span></div>
           <div className="searchbox"><Search size={18}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder={t.search}/>{query && <button onClick={() => setQuery('')} aria-label="Clear search"><X size={16}/></button>}</div>
+          <div className="filter-bar"><button type="button" className={filtersOpen ? 'filter-toggle on' : 'filter-toggle'} onClick={() => setFiltersOpen(o => !o)}><SlidersHorizontal size={16}/>{lang === 'RU' ? 'Фильтры' : 'Filters'}{activeFilters > 0 && <b>{activeFilters}</b>}</button>{activeFilters > 0 && <button type="button" className="filter-reset" onClick={resetFilters}>{lang === 'RU' ? 'Сбросить' : 'Reset'}</button>}</div>
+          {filtersOpen && <div className="filter-panel">
+            <div className="f-group"><small>{lang === 'RU' ? 'Цена, ₽' : 'Price, ₽'}</small><div className="f-row"><input type="number" inputMode="decimal" min="0" placeholder={lang === 'RU' ? 'от' : 'from'} value={fMin} onChange={e => setFMin(e.target.value)}/><input type="number" inputMode="decimal" min="0" placeholder={lang === 'RU' ? 'до' : 'to'} value={fMax} onChange={e => setFMax(e.target.value)}/></div></div>
+            <div className="f-group"><small>{lang === 'RU' ? 'По цене' : 'By price'}</small><div className="chips"><button type="button" className={sort === 'cheap' ? 'on' : ''} onClick={() => setSort(sort === 'cheap' ? 'featured' : 'cheap')}>{lang === 'RU' ? 'Сначала дешёвые' : 'Cheapest first'}</button><button type="button" className={sort === 'expensive' ? 'on' : ''} onClick={() => setSort(sort === 'expensive' ? 'featured' : 'expensive')}>{lang === 'RU' ? 'Сначала дорогие' : 'Priciest first'}</button></div></div>
+            <div className="f-group"><small>{lang === 'RU' ? 'Редкость (по самому редкому признаку)' : 'Rarity (rarest trait)'}</small><div className="chips">{[0, 1, 3, 10].map(v => <button type="button" key={v} className={fRarity === v ? 'on' : ''} onClick={() => setFRarity(v)}>{v === 0 ? (lang === 'RU' ? 'Любая' : 'Any') : `≤ ${v}%`}</button>)}</div></div>
+            <div className="chips"><button type="button" className={fOnSale ? 'on' : ''} onClick={() => setFOnSale(v => !v)}>{lang === 'RU' ? 'Только в продаже' : 'For sale only'}</button></div>
+          </div>}
           <div className="sort-tabs">
             <button className={sort === 'featured' ? 'active' : ''} onClick={() => setSort('featured')}>{t.featured}</button>
             <button className={sort === 'low' ? 'active' : ''} onClick={() => setSort('low')}>{t.low}</button>
@@ -674,7 +766,7 @@ function App() {
               <div className="user-data"><h2>{fullName || telegramUser.username || `ID ${telegramUser.id}`}</h2><b>{telegramUser.username ? `@${telegramUser.username}` : (lang === 'EN' ? 'Username not set' : 'Имя пользователя не задано')}</b><small>TELEGRAM ID&nbsp; {telegramUser.id}</small></div>
             </div>
             <div className="profile-stats">
-              <div><small>{t.balance}</small><b>{fmt(stats.balance)} ₽</b></div><div><small>{t.spent}</small><b>{fmt(stats.spent)}</b></div>
+              <div><small>{t.balance}</small><b>{fmt(stats.balance)} ₽</b></div><div><small>{t.spent}</small><b>{fmt(stats.spent)} ₽</b></div>
               <div><small>{t.purchases}</small><b>{fmt(stats.purchases)}</b></div>
               <div className="language-stat"><small>{t.language}</small><button onClick={() => setLang(lang === 'EN' ? 'RU' : 'EN')}>{lang}<ChevronDown size={15}/></button></div>
             </div>
@@ -682,17 +774,19 @@ function App() {
           </> : <div className="telegram-connect">
             <div className="connect-icon"><UserRoundCheck size={26}/></div><h3>{t.notConnected}</h3><p>{t.telegramConnect}</p><a className="primary-btn connect-button" href={botUrl} target="_blank" rel="noreferrer">{t.connect} <ExternalLink size={14}/></a>
           </div>}
-          <div className="hist"><h3>{lang === 'RU' ? 'История покупок' : 'Purchase history'}</h3><p>{lang === 'RU' ? 'Покупок пока нет.' : 'No purchases yet.'}</p></div>
-          <div className="hist"><h3>{lang === 'RU' ? 'История операций' : 'Transaction history'}</h3><p>{lang === 'RU' ? 'Операций пока нет.' : 'No transactions yet.'}</p></div>
-          <div className="wd-card" aria-disabled="true">
-            <div className="wd-head"><div><span className="wd-kicker">{lang === 'RU' ? 'ВЫВОД В РУБЛЯХ' : 'WITHDRAW IN RUB'}</span><h3>{lang === 'RU' ? 'Вывести в рублях' : 'Withdraw in rubles'}</h3><small>{lang === 'RU' ? 'Пока недоступно' : 'Currently unavailable'}</small></div><div className="wd-icon"><Banknote size={20}/></div></div>
+          <div className="hist"><h3>{lang === 'RU' ? 'История покупок' : 'Purchase history'}</h3>{history.some(h => h.kind === 'purchase') ? <ul className="hist-list">{history.filter(h => h.kind === 'purchase').map(h => <li key={h.id}><button type="button" className="hist-row" onClick={() => h.link && openGift(h.link)}><span className="hist-ico"><Gift size={16}/></span><span className="hist-main"><b>{h.title}</b><small>{dt(h.createdAt)}</small></span><span className="hist-amt">{fmt(h.amount)} ₽</span></button></li>)}</ul> : <p>{lang === 'RU' ? 'Покупок пока нет.' : 'No purchases yet.'}</p>}</div>
+          <div className="hist"><h3>{lang === 'RU' ? 'История операций' : 'Transaction history'}</h3>{history.some(h => h.kind === 'operation') ? <ul className="hist-list">{history.filter(h => h.kind === 'operation').map(h => <li key={h.id}><div className="hist-row"><span className={h.opType === 'profit' ? 'hist-ico profit' : 'hist-ico'}>{h.opType === 'profit' ? <TrendingUp size={16}/> : <Wallet size={16}/>}</span><span className="hist-main"><b>{opLabel(h.opType)}</b><small>{dt(h.createdAt)}</small></span><span className="hist-amt plus">+{fmt(h.amount)} ₽</span></div></li>)}</ul> : <p>{lang === 'RU' ? 'Операций пока нет.' : 'No transactions yet.'}</p>}</div>
+          <div className="wd-card">
+            <div className="wd-head"><div><span className="wd-kicker">{lang === 'RU' ? 'ВЫВОД В РУБЛЯХ' : 'WITHDRAW IN RUB'}</span><h3>{lang === 'RU' ? 'Вывести в рублях' : 'Withdraw in rubles'}</h3><small>{lang === 'RU' ? 'Обработка до 48 часов' : 'Processed within 48 hours'}</small></div><div className="wd-icon"><Banknote size={20}/></div></div>
             <div className="wd-tabs"><button type="button" className={wdMethod === 'card' ? 'on' : ''} onClick={() => setWdMethod('card')}><CreditCard size={14}/>{lang === 'RU' ? 'Банковская карта' : 'Bank card'}</button><button type="button" className={wdMethod === 'phone' ? 'on' : ''} onClick={() => setWdMethod('phone')}><Phone size={14}/>{lang === 'RU' ? 'По номеру телефона' : 'By phone number'}</button></div>
-            <div className="wd-field wd-select"><span>{lang === 'RU' ? 'Сбербанк' : 'Sberbank'}</span><ChevronDown size={15}/></div>
-            <input className="wd-field" disabled placeholder={wdMethod === 'card' ? (lang === 'RU' ? 'Номер карты' : 'Card number') : (lang === 'RU' ? 'Номер телефона' : 'Phone number')}/>
-            <div className="wd-row"><input className="wd-field" disabled placeholder="0"/><button type="button" className="wd-all" disabled>{lang === 'RU' ? 'ВСЁ' : 'MAX'}</button></div>
-            <div className="wd-receive"><div><small>{lang === 'RU' ? 'ВЫ ПОЛУЧИТЕ' : 'YOU RECEIVE'}</small><b>0 ₽</b></div><span className="wd-refresh"><RefreshCw size={16}/></span></div>
-            <button type="button" className="wd-submit" disabled><Banknote size={16}/>{lang === 'RU' ? 'Пока недоступно' : 'Currently unavailable'}</button>
-            <p className="wd-note">{lang === 'RU' ? 'Вывод средств временно недоступен.' : 'Withdrawals are temporarily unavailable.'}</p>
+            <select className="wd-field" value={wd.bank} onChange={e => setWd(o => ({ ...o, bank: e.target.value }))}>{['Сбербанк', 'Т-Банк', 'Альфа-Банк', 'ВТБ', lang === 'RU' ? 'Другой банк' : 'Other bank'].map(b => <option key={b}>{b}</option>)}</select>
+            <input className="wd-field" inputMode="numeric" value={wd.req} onChange={e => setWd(o => ({ ...o, req: e.target.value, result: 'idle' }))} placeholder={wdMethod === 'card' ? (lang === 'RU' ? 'Номер карты' : 'Card number') : (lang === 'RU' ? 'Номер телефона' : 'Phone number')}/>
+            <div className="wd-row"><input className="wd-field" type="number" inputMode="decimal" min="0" value={wd.amount} onChange={e => setWd(o => ({ ...o, amount: e.target.value, result: 'idle' }))} placeholder={lang === 'RU' ? 'Сумма, ₽' : 'Amount, ₽'}/><button type="button" className="wd-all" onClick={() => setWd(o => ({ ...o, amount: String(stats.balance), result: 'idle' }))}>{lang === 'RU' ? 'ВСЁ' : 'MAX'}</button></div>
+            <div className="wd-receive"><div><small>{lang === 'RU' ? 'ВЫ ПОЛУЧИТЕ' : 'YOU RECEIVE'}</small><b>{fmt(Number(wd.amount.replace(',', '.')) || 0)} ₽</b></div><span className="wd-refresh"><RefreshCw size={16}/></span></div>
+            <button type="button" className="wd-submit" onClick={submitWithdraw}><Banknote size={16}/>{lang === 'RU' ? 'Вывести в рублях' : 'Withdraw in rubles'}</button>
+            {wd.result === 'low' && <div className="wd-result low">{lang === 'RU' ? `Недостаточно средств на балансе. Ваш баланс: ${fmt(stats.balance)} ₽.` : `Insufficient balance. Your balance: ${fmt(stats.balance)} ₽.`}</div>}
+            {wd.result === 'ok' && <div className="wd-result ok">{lang === 'RU' ? 'Вывод будет выполнен в течение 48 часов. Для оформления обратитесь к менеджеру: ' : 'Your withdrawal will be completed within 48 hours. To proceed, contact the manager: '}<a href={manager.url} target="_blank" rel="noreferrer">@{manager.username}</a></div>}
+            <p className="wd-note">{lang === 'RU' ? 'Вывод обрабатывается до 48 часов после обращения к менеджеру.' : 'Withdrawals are processed within 48 hours after contacting the manager.'}</p>
           </div>
           <a className="bot-card-link" href={botUrl} target="_blank" rel="noreferrer"><span className="bot-avatar"><ShieldCheck size={19}/></span><span><b>@Playerok_Guarantor_Bot</b><small>{t.bot}</small></span><ExternalLink size={15}/></a>
         </div>
@@ -727,6 +821,17 @@ function App() {
           <div className="admin-tools"><button onClick={exportCatalog}><Upload size={15}/>Export JSON</button><label className="import-button"><ImagePlus size={15}/>Import JSON<input type="file" accept="application/json,.json" onChange={e => { importCatalog(e.target.files?.[0]); e.currentTarget.value = ''; }}/></label></div>
           {catalog.map(g => <div className="admin-gift-row" key={g.id}><img src={g.image} alt=""/><span><b>{g.collection} #{g.number}</b><small>{g.model} · {g.backdrop} · {g.symbol}</small><span className="price-edit"><input type="number" min="0" step="any" placeholder={lang === 'RU' ? 'Цена ₽' : 'Price ₽'} value={priceEdits[g.id] ?? (g.price ?? '')} onChange={e => setPriceEdits(old => ({ ...old, [g.id]: e.target.value }))}/><button type="button" aria-label="Save price" onClick={() => savePrice(g.id)}><CheckCircle2 size={15}/></button></span></span><button aria-label={`${t.delete} ${g.collection} ${g.number}`} onClick={() => deleteGift(g.id)}><Trash2 size={16}/></button></div>)}
         </section>
+        <form className="admin-form panel review-admin-form" onSubmit={saveHistory}>
+          <h2><ShoppingBag size={19}/>{lang === 'RU' ? 'История пользователя' : 'User history'}</h2>
+          <label>{t.userId}<input required inputMode="numeric" pattern="[0-9]{1,15}" value={histForm.telegramId} onChange={e => setHistForm(old => ({ ...old, telegramId: e.target.value.trim() }))} placeholder="123456789"/></label>
+          <div className="admin-rating-field"><div className="admin-rating-picker">{(['purchase', 'topup', 'profit'] as const).map(m => <button key={m} type="button" className={histForm.type === m ? 'rating-star selected' : 'rating-star'} style={{ width: 'auto', padding: '0 12px' }} onClick={() => setHistForm(old => ({ ...old, type: m }))}>{m === 'purchase' ? (lang === 'RU' ? 'Покупка' : 'Purchase') : m === 'topup' ? (lang === 'RU' ? 'Пополнение' : 'Top-up') : (lang === 'RU' ? 'Прибыль' : 'Profit')}</button>)}</div></div>
+          {histForm.type === 'purchase' && <label>{lang === 'RU' ? 'Ссылка на NFT' : 'NFT link'}<input required value={histForm.link} onChange={e => setHistForm(old => ({ ...old, link: e.target.value }))} placeholder="https://t.me/nft/MoodPack-112928"/></label>}
+          <label>{lang === 'RU' ? 'Сумма, ₽' : 'Amount, ₽'}<input required type="number" step="any" min="0" value={histForm.amount} onChange={e => setHistForm(old => ({ ...old, amount: e.target.value }))} placeholder="1900"/></label>
+          <label>{t.reviewDate}<input type="datetime-local" required value={histForm.date} onChange={e => setHistForm(old => ({ ...old, date: e.target.value }))}/></label>
+          <button className="primary-btn admin-submit" type="submit"><Plus size={17}/>{lang === 'RU' ? 'Добавить запись' : 'Add entry'}</button>
+          <button type="button" className="admin-ghost" onClick={loadAdminHist}>{lang === 'RU' ? 'Показать записи этого ID' : 'Show entries for this ID'}</button>
+          {adminHist.map(h => <div className="admin-hist-row" key={h.id}><span><b>{h.title}</b><small>{h.kind === 'operation' ? opLabel(h.opType) + ' · ' : ''}{fmt(h.amount)} ₽ · {dt(h.createdAt)}</small></span><button type="button" aria-label="Delete" onClick={() => deleteHistory(h.id)}><Trash2 size={15}/></button></div>)}
+        </form>
         <form className="admin-form panel review-admin-form" onSubmit={saveStats}>
           <h2><Wallet size={19}/>{t.statsTitle}</h2>
           <label>{t.userId}<input required inputMode="numeric" pattern="[0-9]{1,15}" value={statsForm.telegramId} onChange={e => setStatsForm(old => ({ ...old, telegramId: e.target.value.trim() }))} placeholder="123456789"/></label>
@@ -762,13 +867,18 @@ function App() {
       <span>Playerok</span>
     </footer>
     {!splashGone && <div className={splashVisible ? 'splash' : 'splash out'} aria-hidden="true">
+      <i className="sp-orb a"/><i className="sp-orb b"/>
       <div className="splash-mark">
+        <span className="sp-halo"/>
         <svg className="splash-ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" className="splash-track"/><circle cx="50" cy="50" r="46" className="splash-arc"/></svg>
         <img src="/playerok-symbol.png" alt=""/>
+        <span className="sp-dot d1"/><span className="sp-dot d2"/><span className="sp-dot d3"/>
       </div>
       <b className="splash-name">PLAYEROK</b>
+      <small className="splash-tag">{lang === 'RU' ? 'Маркетплейс подарков' : 'Gift marketplace'}</small>
       <div className="splash-status"><span>{lang === 'RU' ? 'Подключаемся' : 'Connecting'}</span><span>{lang === 'RU' ? 'Загружаем подарки' : 'Loading gifts'}</span><span>{lang === 'RU' ? 'Почти готово' : 'Almost ready'}</span></div>
-      <div className="splash-bar"><i/></div>
+      <div className="splash-bar"><i style={{ width: `${pct}%` }}/></div>
+      <span className="splash-pct">{Math.round(pct)}%</span>
     </div>}
     {buyGift && <div className="modal-back" onClick={() => setBuyGift(null)}><div className="modal-card" role="dialog" onClick={e => e.stopPropagation()}>
       <button className="modal-x" aria-label="Close" onClick={() => setBuyGift(null)}><X size={16}/></button>
@@ -776,7 +886,7 @@ function App() {
       <h3>{lang === 'RU' ? 'Недостаточно средств на балансе' : 'Insufficient balance'}</h3>
       <p>{lang === 'RU' ? `Цена: ${fmt(buyGift.price ?? 0)} ₽, ваш баланс: ${fmt(stats.balance)} ₽. Пополните баланс через бота или менеджера.` : `Price: ${fmt(buyGift.price ?? 0)} ₽, your balance: ${fmt(stats.balance)} ₽. Top up via the bot or the manager.`}</p>
       <a className="primary-btn" href={botUrl} target="_blank" rel="noreferrer"><ShieldCheck size={16}/>{lang === 'RU' ? 'Пополнить через бота' : 'Top up via bot'}</a>
-      <a className="primary-btn modal-alt" href={managerUrl} target="_blank" rel="noreferrer"><UserRound size={16}/>{lang === 'RU' ? 'Написать менеджеру' : 'Contact manager'}</a>
+      <a className="primary-btn modal-alt" href={manager.url} target="_blank" rel="noreferrer"><UserRound size={16}/>{lang === 'RU' ? 'Написать менеджеру' : 'Contact manager'} @{manager.username}</a>
     </div></div>}
     {toast && <div className="toast"><CheckCircle2 size={16}/>{toast}</div>}
   </div>;

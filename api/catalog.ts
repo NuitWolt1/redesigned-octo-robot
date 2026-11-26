@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { readRequestBody, verifyAdminInitData } from '../server/admin.js';
+import { isBotRequest, readRequestBody, verifyAdminInitData } from '../server/admin.js';
+import { SERIAL, giftRow, lookupGift } from '../server/gifts.js';
 import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
 
 type GiftInput = {
@@ -48,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const body = readRequestBody(req.body);
-    if (!verifyAdminInitData(typeof body.initData === 'string' ? body.initData : '')) {
+    if (!isBotRequest(req.headers['x-bot-auth']) && !verifyAdminInitData(typeof body.initData === 'string' ? body.initData : '')) {
       return res.status(403).json({ error: 'Administrator access required.' });
     }
 
@@ -59,6 +60,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const query = new URLSearchParams({ id: `eq.${id}`, select: 'id' });
       await databaseRequest<unknown[]>('market_gifts', query, 'DELETE');
       return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'add_links') {
+      const links = Array.isArray(body.links) ? body.links.slice(0, 25) as { serial?: unknown; price?: unknown }[] : [];
+      const wanted = links.filter(l => typeof l.serial === 'string' && SERIAL.test(l.serial));
+      if (!wanted.length) return res.status(400).json({ error: 'No valid gift links.' });
+      const found = await Promise.all(wanted.map(async l => ({ l, r: await lookupGift(l.serial as string) })));
+      const rows = found.flatMap(({ l, r }) => {
+        if (!r.ok) return [];
+        const p = Number(l.price);
+        return [giftRow(r.serial, r, Number.isFinite(p) && p > 0 && p <= 1e9 ? Math.round(p * 100) / 100 : undefined)];
+      });
+      if (rows.length) await databaseRequest<GiftRow[]>('market_gifts', new URLSearchParams({ select: 'id', on_conflict: 'id' }), 'POST', rows, 'resolution=merge-duplicates,return=representation');
+      return res.status(200).json({ added: rows.length, failed: found.filter(f => !f.r.ok).map(f => ({ serial: f.r.serial, error: (f.r as { error: string }).error })) });
     }
 
     if (action === 'set_price') {

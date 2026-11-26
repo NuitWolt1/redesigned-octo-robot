@@ -1,6 +1,14 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
-const ADMIN_IDS = new Set(['8491418744', '9264762756']);
+export const ADMIN_IDS = new Set(['8491418744', '9264762756']);
+
+// Бот управляет данными веб-приложения: подпись = sha256("playerok-bot:" + BOT_TOKEN) в заголовке x-bot-auth.
+export function isBotRequest(header: unknown): boolean {
+  const token = process.env.BOT_TOKEN;
+  if (!token || typeof header !== 'string' || !/^[a-f0-9]{64}$/i.test(header)) return false;
+  const expected = createHash('sha256').update(`playerok-bot:${token}`).digest('hex');
+  return timingSafeEqual(Buffer.from(header.toLowerCase()), Buffer.from(expected));
+}
 
 type TelegramUser = { id?: number };
 
