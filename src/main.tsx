@@ -809,7 +809,7 @@ function App() {
             <button className={sort === 'high' ? 'active' : ''} onClick={() => setSort('high')}>{t.high}</button>
           </div>
           <div className="gift-grid">
-            {filtered.map(g => <article className="gift-card" key={g.id} role="button" tabIndex={0} onClick={() => openGift(g.source)} onKeyDown={e => { if (e.key === 'Enter') openGift(g.source); }}><button type="button" className="share-btn" aria-label={lang === 'RU' ? 'Поделиться' : 'Share'} onClick={e => { e.stopPropagation(); shareGift(g); }}><Share2 size={14}/></button>
+            {filtered.map(g => <article className="gift-card" key={g.id} role="button" tabIndex={0} onClick={() => openGift(g.source)} onKeyDown={e => { if (e.key === 'Enter') openGift(g.source); }}>
               <div className="gift-art"><img src={g.image} alt={`${g.collection} #${g.number}`} loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement?.classList.add('image-error'); }}/>
                 <span className="serial-ribbon">#{g.number.toLocaleString('en-US')}</span>
               </div>
@@ -820,7 +820,7 @@ function App() {
                   <div className="attribute"><small>{t.backdrop}</small><b><i className={`backdrop-dot ${g.backdrop.toLowerCase().replace(/ /g, '-')}`}/>{g.backdrop}</b><em>{g.backdropRarity}</em></div>
                   <div className="attribute"><small>{t.symbol}</small><b>{g.symbol}</b><em>{g.symbolRarity}</em></div>
                 </div>
-                <div className="gift-card-bottom"><a href={g.source} target="_blank" rel="noreferrer" onClick={e => { e.preventDefault(); e.stopPropagation(); openGift(g.source); }}>{t.openNft} <ExternalLink size={12}/></a>{g.price != null ? <button type="button" className="buy-btn" onClick={e => { e.stopPropagation(); buyNow(g); }}><ShoppingBag size={14}/>{fmt(g.price)} ₽</button> : <span className="unavailable"><ShoppingBag size={14}/>{t.unavailable}</span>}</div>
+                <div className="gift-card-bottom"><a href={g.source} target="_blank" rel="noreferrer" onClick={e => { e.preventDefault(); e.stopPropagation(); openGift(g.source); }}>{t.openNft} <ExternalLink size={12}/></a><div className="gift-card-actions">{g.price != null ? <button type="button" className="buy-btn" onClick={e => { e.stopPropagation(); buyNow(g); }}><ShoppingBag size={14}/>{fmt(g.price)} ₽</button> : <span className="unavailable"><ShoppingBag size={14}/>{t.unavailable}</span>}<button type="button" className="share-btn" aria-label={lang === 'RU' ? 'Поделиться' : 'Share'} title={lang === 'RU' ? 'Поделиться' : 'Share'} onClick={e => { e.stopPropagation(); shareGift(g); }}><Share2 size={15}/></button></div></div>
               </div>
             </article>)}
           </div>
