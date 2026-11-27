@@ -362,7 +362,10 @@ function App() {
     const q = query.trim().toLowerCase();
     const rarityOf = (g: GiftItem) => Math.min(...[g.modelRarity, g.backdropRarity, g.symbolRarity].map(r => { const n = parseFloat(String(r).replace(',', '.')); return Number.isFinite(n) ? n : Infinity; }));
     const min = fMin.trim() === '' ? null : Number(fMin), max = fMax.trim() === '' ? null : Number(fMax);
-    let list = catalog.filter(g => [g.collection, g.number, g.model, g.backdrop, g.symbol].join(' ').toLowerCase().includes(q));
+    // Поиск не зависит от пробелов, дефисов и запятых: «IceCream-274200», «ice cream 274 200» и «#274,200» находят один подарок.
+    const norm = (v: string) => v.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    const nq = norm(q);
+    let list = catalog.filter(g => { const hay = [g.collection, g.number, g.model, g.backdrop, g.symbol, g.serial].join(' ').toLowerCase(); return !q || hay.includes(q) || norm(hay).includes(nq); });
     if (fOnSale || min !== null || max !== null || sort === 'cheap' || sort === 'expensive') list = list.filter(g => g.price != null);
     if (min !== null && Number.isFinite(min)) list = list.filter(g => (g.price ?? 0) >= min);
     if (max !== null && Number.isFinite(max)) list = list.filter(g => (g.price ?? 0) <= max);
