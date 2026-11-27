@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   createRoot } from 'react-dom/client';
 import {
-  Gamepad2, Gift, LockKeyhole, Sparkles, UserRound, Search, ChevronDown, Gem, TrendingUp, Activity, Wallet, ShoppingBag, ArrowUpRight, X, ExternalLink, ShieldCheck, Moon, Sun, ArrowLeft, Plus, Trash2, ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star, CreditCard, Phone, Banknote, RefreshCw, SlidersHorizontal
+  Gamepad2, Gift, LockKeyhole, Sparkles, UserRound, Search, ChevronDown, Gem, TrendingUp, Activity, Wallet, ShoppingBag, ArrowUpRight, X, ExternalLink, ShieldCheck, Moon, Sun, ArrowLeft, Plus, Trash2, ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star, CreditCard, Phone, Banknote, RefreshCw, SlidersHorizontal, Share2
 } from 'lucide-react';
 import './style.css';
 import './design.css';
@@ -55,6 +55,9 @@ declare global {
         ready?: () => void;
         expand?: () => void;
         openTelegramLink?: (url: string) => void;
+        onEvent?: (event: string, handler: () => void) => void;
+        offEvent?: (event: string, handler: () => void) => void;
+        HapticFeedback?: { impactOccurred?: (style: 'light' | 'medium' | 'heavy') => void; notificationOccurred?: (type: 'error' | 'success' | 'warning') => void };
         platform?: string;
         version?: string;
         colorScheme?: 'light' | 'dark';
@@ -218,16 +221,20 @@ function App() {
     return (['games', 'market', 'reviews', 'gifts', 'event', 'profile'] as Tab[]).find(id => id === wanted) ?? 'market';
   });
   const [lang, setLang] = useState<Lang>(() => {
+    const fromBot = new URLSearchParams(window.location.search).get('lang')?.toLowerCase();
+    if (fromBot === 'ru' || fromBot === 'en') return fromBot === 'ru' ? 'RU' : 'EN';
     const tgLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code?.toLowerCase();
     return tgLang?.startsWith('ru') ? 'RU' : 'EN';
   });
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem(THEME_KEY);
-    return saved === 'light' ? 'light' : 'dark';
+    if (saved === 'light' || saved === 'dark') return saved;
+    return window.Telegram?.WebApp?.colorScheme === 'light' ? 'light' : 'dark';
   });
+  const themeManual = useRef(localStorage.getItem(THEME_KEY) !== null);
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(() => getTelegramUser());
   const [isAdmin, setIsAdmin] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get('q') ?? '');
   const [sort, setSort] = useState<Sort>('featured');
   const [sub, setSub] = useState<'gifts' | 'offers' | 'history'>('gifts');
   const [langOpen, setLangOpen] = useState(false);
@@ -260,6 +267,11 @@ function App() {
   const [fRarity, setFRarity] = useState(0);
   const [fOnSale, setFOnSale] = useState(false);
   const [pct, setPct] = useState(0);
+  const [fx, setFx] = useState(() => { try { return { haptics: localStorage.getItem('playerok.haptics') !== '0', sounds: localStorage.getItem('playerok.sounds') === '1' }; } catch { return { haptics: true, sounds: false }; } });
+  const fxRef = useRef(fx);
+  const [summary, setSummary] = useState<Record<string, number> | null>(null);
+  const [userCard, setUserCard] = useState<Record<string, string | number> | null>(null);
+  const [cardId, setCardId] = useState('');
   const [myGifts, setMyGifts] = useState<MyGift[]>([]);
   const [sell, setSell] = useState<{ id: string; price: string } | null>(null);
   const [ugForm, setUgForm] = useState({ telegramId: '', links: '' });
@@ -338,7 +350,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(THEME_KEY, theme);
+    if (themeManual.current) localStorage.setItem(THEME_KEY, theme);
     document.documentElement.dataset.theme = theme;
     document.body.dataset.theme = theme;
     const color = theme === 'dark' ? '#171a24' : '#f4f7fc';
@@ -371,6 +383,7 @@ function App() {
   };
   const showToast = (message: string) => {
     setToast(message);
+    if (fxRef.current.haptics) window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.(/недостаточно|insufficient|invalid|error|ошиб|неверн|denied|доступ/i.test(message) ? 'error' : 'success');
     window.setTimeout(() => setToast(''), 2600);
   };
   const updateForm = (key: keyof typeof giftForm, value: string) => setGiftForm(old => ({ ...old, [key]: value }));
@@ -455,6 +468,18 @@ function App() {
       setCatalog(old => old.map(g => g.id === id ? { ...g, price: result.item.price ?? null } : g));
       setPriceEdits(old => { const next = { ...old }; delete next[id]; return next; });
       showToast(lang === 'RU' ? 'Цена сохранена' : 'Price saved');
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
+  };
+  const shareGift = (g: GiftItem) => {
+    const text = `${g.collection} #${g.number}${g.price != null ? ` — ${fmt(g.price)} ₽` : ''}`;
+    openGift(`https://t.me/share/url?url=${encodeURIComponent(`${botUrl}?start=g_${g.id}`)}&text=${encodeURIComponent(text)}`);
+  };
+  const findUser = async () => {
+    if (!isAdmin || !cardId) return;
+    try {
+      const d = await adminPost<Record<string, string | number>>('/api/admin-stats', { action: 'user', telegramId: cardId });
+      setUserCard(d);
+      setStatsForm(o => ({ ...o, telegramId: cardId })); setHistForm(o => ({ ...o, telegramId: cardId })); setUgForm(o => ({ ...o, telegramId: cardId }));
     } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
   };
   const buyNow = (g: GiftItem) => {
@@ -607,6 +632,34 @@ function App() {
   const removeUserGift = async (id: string) => {
     try { await adminPost('/api/mygifts', { action: 'remove', id }); setUgList(old => old.filter(g => g.id !== id)); } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
   };
+  // Вибрация и звуки на нажатия; тема из Telegram, пока пользователь не выбрал свою.
+  useEffect(() => { fxRef.current = fx; try { localStorage.setItem('playerok.haptics', fx.haptics ? '1' : '0'); localStorage.setItem('playerok.sounds', fx.sounds ? '1' : '0'); } catch { /* ignore */ } }, [fx]);
+  useEffect(() => {
+    let audio: AudioContext | null = null;
+    const tick = () => {
+      try {
+        audio = audio ?? new AudioContext();
+        const osc = audio.createOscillator(), gain = audio.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(920, audio.currentTime); osc.frequency.exponentialRampToValueAtTime(620, audio.currentTime + .05);
+        gain.gain.setValueAtTime(.05, audio.currentTime); gain.gain.exponentialRampToValueAtTime(.0001, audio.currentTime + .06);
+        osc.connect(gain).connect(audio.destination); osc.start(); osc.stop(audio.currentTime + .07);
+      } catch { /* ignore */ }
+    };
+    const onClick = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement | null)?.closest?.('button, a, [role="button"], select')) return;
+      if (fxRef.current.haptics) window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light');
+      if (fxRef.current.sounds) tick();
+    };
+    document.addEventListener('click', onClick, true);
+    const app = window.Telegram?.WebApp;
+    const onTheme = () => { if (!themeManual.current) setTheme(app?.colorScheme === 'light' ? 'light' : 'dark'); };
+    app?.onEvent?.('themeChanged', onTheme);
+    return () => { document.removeEventListener('click', onClick, true); app?.offEvent?.('themeChanged', onTheme); };
+  }, []);
+  useEffect(() => {
+    if (tab !== 'admin' || !isAdmin) return;
+    adminPost<Record<string, number>>('/api/admin-stats', { action: 'summary' }).then(setSummary).catch(() => {});
+  }, [tab, isAdmin]);
   // История покупок/операций и актуальный юзернейм менеджера.
   useEffect(() => {
     let active = true;
@@ -697,7 +750,7 @@ function App() {
       </button>
       <div className="header-actions">
         <a className="bot-link" href={botUrl} target="_blank" rel="noreferrer">@Playerok_Guarantor_Bot <ExternalLink size={12}/></a>
-        <button className="theme-toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={theme === 'light' ? t.dark : t.light} title={theme === 'light' ? t.dark : t.light}>
+        <button className="theme-toggle" onClick={() => { themeManual.current = true; setTheme(theme === 'light' ? 'dark' : 'light'); }} aria-label={theme === 'light' ? t.dark : t.light} title={theme === 'light' ? t.dark : t.light}>
           {theme === 'light' ? <Moon size={17}/> : <Sun size={17}/>}
         </button>
         <div className="lang-wrap">
@@ -756,7 +809,7 @@ function App() {
             <button className={sort === 'high' ? 'active' : ''} onClick={() => setSort('high')}>{t.high}</button>
           </div>
           <div className="gift-grid">
-            {filtered.map(g => <article className="gift-card" key={g.id} role="button" tabIndex={0} onClick={() => openGift(g.source)} onKeyDown={e => { if (e.key === 'Enter') openGift(g.source); }}>
+            {filtered.map(g => <article className="gift-card" key={g.id} role="button" tabIndex={0} onClick={() => openGift(g.source)} onKeyDown={e => { if (e.key === 'Enter') openGift(g.source); }}><button type="button" className="share-btn" aria-label={lang === 'RU' ? 'Поделиться' : 'Share'} onClick={e => { e.stopPropagation(); shareGift(g); }}><Share2 size={14}/></button>
               <div className="gift-art"><img src={g.image} alt={`${g.collection} #${g.number}`} loading="lazy" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement?.classList.add('image-error'); }}/>
                 <span className="serial-ribbon">#{g.number.toLocaleString('en-US')}</span>
               </div>
@@ -834,6 +887,10 @@ function App() {
           </> : <div className="telegram-connect">
             <div className="connect-icon"><UserRoundCheck size={26}/></div><h3>{t.notConnected}</h3><p>{t.telegramConnect}</p><a className="primary-btn connect-button" href={botUrl} target="_blank" rel="noreferrer">{t.connect} <ExternalLink size={14}/></a>
           </div>}
+          <div className="fx-card">
+            <label className="fx-row"><span>{lang === 'RU' ? 'Вибрация' : 'Haptics'}</span><input type="checkbox" checked={fx.haptics} onChange={e => setFx(o => ({ ...o, haptics: e.target.checked }))}/><i/></label>
+            <label className="fx-row"><span>{lang === 'RU' ? 'Звуки' : 'Sounds'}</span><input type="checkbox" checked={fx.sounds} onChange={e => setFx(o => ({ ...o, sounds: e.target.checked }))}/><i/></label>
+          </div>
           <div className="hist"><h3>{lang === 'RU' ? 'История покупок' : 'Purchase history'}</h3>{history.some(h => h.kind === 'purchase') ? <ul className="hist-list">{history.filter(h => h.kind === 'purchase').map(h => <li key={h.id}><button type="button" className="hist-row" onClick={() => h.link && openGift(h.link)}><span className="hist-ico"><Gift size={16}/></span><span className="hist-main"><b>{h.title}</b><small>{dt(h.createdAt)}</small></span><span className="hist-amt">{fmt(h.amount)} ₽</span></button></li>)}</ul> : <p>{lang === 'RU' ? 'Покупок пока нет.' : 'No purchases yet.'}</p>}</div>
           <div className="hist"><h3>{lang === 'RU' ? 'История операций' : 'Transaction history'}</h3>{history.some(h => h.kind === 'operation') ? <ul className="hist-list">{history.filter(h => h.kind === 'operation').map(h => <li key={h.id}><div className="hist-row"><span className={h.opType === 'profit' ? 'hist-ico profit' : 'hist-ico'}>{h.opType === 'profit' ? <TrendingUp size={16}/> : <Wallet size={16}/>}</span><span className="hist-main"><b>{opLabel(h.opType)}</b><small>{dt(h.createdAt)}</small></span><span className="hist-amt plus">+{fmt(h.amount)} ₽</span></div></li>)}</ul> : <p>{lang === 'RU' ? 'Операций пока нет.' : 'No transactions yet.'}</p>}</div>
           <div className="wd-card">
@@ -880,6 +937,25 @@ function App() {
           <div className="admin-list-title"><h2>{t.catalogList}</h2><span className="count-pill">{catalog.length}</span></div>
           <div className="admin-tools"><button onClick={exportCatalog}><Upload size={15}/>Export JSON</button><label className="import-button"><ImagePlus size={15}/>Import JSON<input type="file" accept="application/json,.json" onChange={e => { importCatalog(e.target.files?.[0]); e.currentTarget.value = ''; }}/></label></div>
           {catalog.map(g => <div className="admin-gift-row" key={g.id}><img src={g.image} alt=""/><span><b>{g.collection} #{g.number}</b><small>{g.model} · {g.backdrop} · {g.symbol}</small><span className="price-edit"><input type="number" min="0" step="any" placeholder={lang === 'RU' ? 'Цена ₽' : 'Price ₽'} value={priceEdits[g.id] ?? (g.price ?? '')} onChange={e => setPriceEdits(old => ({ ...old, [g.id]: e.target.value }))}/><button type="button" aria-label="Save price" onClick={() => savePrice(g.id)}><CheckCircle2 size={15}/></button></span></span><button aria-label={`${t.delete} ${g.collection} ${g.number}`} onClick={() => deleteGift(g.id)}><Trash2 size={16}/></button></div>)}
+        </section>
+        <section className="admin-form panel">
+          <h2><Activity size={19}/>{lang === 'RU' ? 'Сводка' : 'Overview'}</h2>
+          {summary ? <div className="adm-grid">{([
+            [lang === 'RU' ? 'Пользователей' : 'Users', summary.users], [lang === 'RU' ? 'Новых сегодня' : 'New today', summary.newToday], [lang === 'RU' ? 'За 7 дней' : 'Last 7 days', summary.newWeek], [lang === 'RU' ? 'Устройств' : 'Devices', summary.devices],
+            [lang === 'RU' ? 'Подарков в маркете' : 'Market gifts', summary.marketGifts], [lang === 'RU' ? 'В продаже' : 'For sale', summary.forSale], [lang === 'RU' ? 'От пользователей' : 'By users', summary.userListed], [lang === 'RU' ? 'Зачислено' : 'Credited', summary.credited],
+            [lang === 'RU' ? 'Отзывов' : 'Reviews', summary.reviews], [lang === 'RU' ? 'Записей истории' : 'History rows', summary.history], [lang === 'RU' ? 'Сумма балансов' : 'Total balance', `${fmt(summary.totalBalance)} ₽`], [lang === 'RU' ? 'Потрачено всего' : 'Total spent', `${fmt(summary.totalSpent)} ₽`]
+          ] as [string, string | number][]).map(([k, v]) => <div key={k}><small>{k}</small><b>{typeof v === 'number' ? fmt(v) : v}</b></div>)}</div> : <p className="admin-hint">…</p>}
+          <button type="button" className="admin-ghost" onClick={() => adminPost<Record<string, number>>('/api/admin-stats', { action: 'summary' }).then(setSummary).catch(() => {})}>{lang === 'RU' ? 'Обновить' : 'Refresh'}</button>
+        </section>
+        <section className="admin-form panel">
+          <h2><UserRound size={19}/>{lang === 'RU' ? 'Карточка пользователя' : 'User card'}</h2>
+          <label>{t.userId}<input inputMode="numeric" value={cardId} onChange={e => setCardId(e.target.value.trim())} placeholder="123456789"/></label>
+          <button type="button" className="primary-btn admin-submit" onClick={findUser}><Search size={17}/>{lang === 'RU' ? 'Найти' : 'Find'}</button>
+          {userCard && <div className="adm-grid">{([
+            [lang === 'RU' ? 'Баланс' : 'Balance', `${fmt(Number(userCard.balance))} ₽`], [lang === 'RU' ? 'Потрачено' : 'Spent', `${fmt(Number(userCard.spent))} ₽`], [lang === 'RU' ? 'Покупок' : 'Purchases', fmt(Number(userCard.purchases))], [lang === 'RU' ? 'Устройств' : 'Devices', fmt(Number(userCard.devices))],
+            [lang === 'RU' ? 'Подарков' : 'Gifts', fmt(Number(userCard.gifts))], [lang === 'RU' ? 'В продаже' : 'Listed', fmt(Number(userCard.listed))], [lang === 'RU' ? 'Записей истории' : 'History rows', fmt(Number(userCard.history))], [lang === 'RU' ? 'Устройство' : 'Device', String(userCard.lastDevice || '—')]
+          ] as [string, string][]).map(([k, v]) => <div key={k}><small>{k}</small><b>{v}</b></div>)}</div>}
+          {userCard && <p className="admin-hint">{lang === 'RU' ? 'ID подставлен во все формы ниже.' : 'ID was filled into the forms below.'}</p>}
         </section>
         <form className="admin-form panel review-admin-form" onSubmit={addUserGifts}>
           <h2><Gift size={19}/>{lang === 'RU' ? 'Зачислить подарок пользователю' : 'Credit a gift to a user'}</h2>

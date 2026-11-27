@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isBotRequest, readRequestBody, verifyAdminInitData, verifyTelegramInitData } from '../server/admin.js';
 import { titleFromSlug } from '../server/gifts.js';
+import { emo } from '../server/emoji.js';
+import { escapeHtml, notify } from '../server/notify.js';
 import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
 
 type Row = { id: string; telegram_id: string; kind: string; title: string; link: string | null; op_type: string | null; amount: number | string; note: string | null; created_at: string };
@@ -52,6 +54,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       row = { telegram_id: telegramId, kind: 'operation', op_type: body.opType, title: OP_TITLES[body.opType], amount, ...when };
     } else return res.status(400).json({ error: 'Invalid entry type.' });
     const rows = await databaseRequest<Row[]>('user_history', new URLSearchParams({ select: '*' }), 'POST', row);
+    const note = row.kind === 'purchase' ? `${emo('🎁')} Покупка записана: <b>${escapeHtml(row.title)}</b> — ${amount} ₽`
+      : row.op_type === 'profit' ? `${emo('✅')} Прибыль с продаж: <b>+${amount} ₽</b>` : `${emo('✅')} Баланс пополнен через менеджера: <b>+${amount} ₽</b>`;
+    await notify(telegramId, note);
     return res.status(201).json({ item: toItem(rows[0]) });
   } catch (error) {
     console.error('History API error:', error);

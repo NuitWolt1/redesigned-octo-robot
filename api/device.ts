@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ADMIN_IDS, readRequestBody, verifyTelegramInitData } from '../server/admin.js';
 import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
+import { emo } from '../server/emoji.js';
 
 const esc = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const short = (v: unknown, n = 80) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
@@ -38,14 +39,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ip = short(String(req.headers['x-forwarded-for'] || '').split(',')[0], 45);
     const place = [short(req.headers['x-vercel-ip-country'], 4), (() => { try { return decodeURIComponent(short(req.headers['x-vercel-ip-city'], 60)); } catch { return ''; } })()].filter(Boolean).join(', ');
     const text = [
-      known.length === 0 ? '🆕 <b>Новый пользователь</b>' : '📱 <b>Новое устройство</b>',
-      `👤 ${esc(name)}${tgUser.username ? ` (@${esc(tgUser.username)})` : ''}`,
+      known.length === 0 ? `${emo('🆕')} <b>Новый пользователь</b>` : `${emo('📱')} <b>Новое устройство</b>`,
+      `${emo('👤')} ${esc(name)}${tgUser.username ? ` (@${esc(tgUser.username)})` : ''}`,
       `🆔 <code>${user.id}</code>`,
-      `📲 ${esc(label)}`,
+      `${/iPhone|iPad|Android/.test(label) ? emo('📱') : emo('💻')} ${esc(label)}`,
       info.screen ? `🖥 ${esc(short(info.screen, 20))} · ${esc(short(info.lang, 20))}` : '',
-      ip || place ? `🌍 ${esc(place)}${ip ? ` · <code>${esc(ip)}</code>` : ''}` : '',
-      `🕐 ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} (МСК)`,
-      `🔢 Устройств у пользователя: ${known.length + 1}`
+      ip || place ? `${emo('🌐')} ${esc(place)}${ip ? ` · <code>${esc(ip)}</code>` : ''}` : '',
+      `${emo('⏰')} ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} (МСК)`,
+      `${emo('🔢')} Устройств у пользователя: ${known.length + 1}`
     ].filter(Boolean).join('\n');
 
     const token = process.env.BOT_TOKEN;

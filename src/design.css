@@ -252,3 +252,17 @@ img{-webkit-user-drag:none;user-drag:none}
 .mg-actions,.mg-sell{display:flex;gap:6px;align-items:center}.mg-actions .buy-btn{flex:1;justify-content:center;font-size:12px;padding:8px 6px}
 .mg-ghost,.mg-x{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:7px 10px;font-size:12px;font-weight:800;display:grid;place-items:center}
 .mg-sell input{min-width:0;flex:1;min-height:36px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:0 10px;font-weight:700}
+
+/* ===== Поделиться, эффекты, сводка админа ===== */
+.share-btn{position:absolute;top:8px;right:8px;z-index:4;width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.5);background:rgba(15,20,40,.45);color:#fff;display:grid;place-items:center;backdrop-filter:blur(8px);transition:transform .3s var(--spring)}
+.share-btn:active{transform:scale(.85)}
+.fx-card{margin-top:16px;border-radius:20px;border:1px solid var(--line);background:var(--surface-2);overflow:hidden}
+.fx-row{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;font-weight:800;font-size:14px;position:relative}
+.fx-row+.fx-row{border-top:1px solid var(--line)}
+.fx-row input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0}
+.fx-row i{width:44px;height:26px;border-radius:13px;background:var(--line);position:relative;transition:background .3s;flex:none}
+.fx-row i:after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .3s var(--spring)}
+.fx-row input:checked+i{background:var(--blue)}.fx-row input:checked+i:after{transform:translateX(18px)}
+.adm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.adm-grid>div{padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--surface-2);min-width:0}
+.adm-grid small{display:block;color:var(--muted);font-size:10.5px;font-weight:700;margin-bottom:3px}.adm-grid b{font-size:16px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}

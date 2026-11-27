@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isBotRequest, readRequestBody, verifyAdminInitData, verifyTelegramInitData } from '../server/admin.js';
 import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
+import { emo } from '../server/emoji.js';
+import { notify } from '../server/notify.js';
 
 type StatsRow = { telegram_id: string; balance: number | string; spent: number | string; purchases: number | string };
 const toStats = (row?: StatsRow) => ({ balance: Number(row?.balance ?? 0), spent: Number(row?.spent ?? 0), purchases: Number(row?.purchases ?? 0) });
@@ -31,6 +33,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(toStats((await find(user.id))[0]));
     }
 
+    if (body.action === 'get') {
+      if (!isBotRequest(req.headers['x-bot-auth'])) return res.status(403).json({ error: 'Bot access required.' });
+      const id = String(body.telegramId ?? '').trim();
+      if (!/^[0-9]{1,15}$/.test(id)) return res.status(400).json({ error: 'Invalid Telegram ID.' });
+      return res.status(200).json(toStats((await find(id))[0]));
+    }
+
     if (body.action !== 'adjust') return res.status(400).json({ error: 'Unknown action.' });
     if (!isBotRequest(req.headers['x-bot-auth']) && !verifyAdminInitData(initData)) return res.status(403).json({ error: 'Administrator access required.' });
 
@@ -52,7 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const query = new URLSearchParams({ select: '*', on_conflict: 'telegram_id' });
     const rows = await databaseRequest<StatsRow[]>('user_stats', query, 'POST', { telegram_id: telegramId, ...next, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=representation');
-    return res.status(200).json(toStats(rows[0]));
+    const saved = toStats(rows[0]);
+    await notify(telegramId, `${emo('✅')} Профиль обновлён\nБаланс: <b>${saved.balance} ₽</b> · Потрачено: <b>${saved.spent} ₽</b> · Покупок: <b>${saved.purchases}</b>`);
+    return res.status(200).json(saved);
   } catch (error) {
     console.error('Stats API error:', error);
     return res.status(500).json({ error: error instanceof Error ? error.message : 'Unexpected server error.' });

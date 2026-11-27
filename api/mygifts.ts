@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isBotRequest, readRequestBody, verifyAdminInitData, verifyTelegramInitData } from '../server/admin.js';
 import { SERIAL, giftRow, lookupGift } from '../server/gifts.js';
 import { databaseIsConfigured, databaseRequest } from '../server/supabase.js';
+import { emo } from '../server/emoji.js';
+import { escapeHtml, notify, notifyAdmins } from '../server/notify.js';
 
 type Row = {
   id: string; telegram_id: string; serial: string; collection: string; gift_number: number; model: string; model_rarity: string;
@@ -49,6 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         backdrop: row.backdrop, backdrop_rarity: row.backdrop_rarity, symbol: row.symbol, symbol_rarity: row.symbol_rarity,
         image: row.image, source: row.source, serial: row.serial, price_rub: price, seller_id: user.id
       }, 'resolution=merge-duplicates,return=representation');
+      await notifyAdmins(`${emo('🎁')} <b>Выставлено на продажу</b>\n${emo('👤')} <code>${user.id}</code>\n${escapeHtml(row.collection)} #${row.gift_number} — ${price} ₽`);
       return res.status(200).json({ item: toItem(await patchPrice(id, price)) });
     }
 
@@ -84,10 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       added.push(`${g.collection} #${g.gift_number}`);
     }
     if (added.length) {
-      await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(6000),
-        body: JSON.stringify({ chat_id: telegramId, parse_mode: 'HTML', text: `🎁 Подарок зачислен: <b>${esc(added.join(', '))}</b>\nОн появился в «Мои подарки», его можно выставить на продажу.` })
-      }).catch(() => undefined);
+      await notify(telegramId, `${emo('🎁')} Подарок зачислен: <b>${esc(added.join(', '))}</b>\n${emo('✅')} Он появился в «Мои подарки», его можно выставить на продажу.`);
     }
     return res.status(200).json({ added, failed });
   } catch (error) {
