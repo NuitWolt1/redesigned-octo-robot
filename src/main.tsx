@@ -4,13 +4,12 @@ import {
 import {
   Gamepad2, Gift, LockKeyhole, Sparkles, UserRound, Search, ChevronDown, Gem, TrendingUp, Activity, Wallet, ShoppingBag, ArrowUpRight, X, ExternalLink, ShieldCheck, Moon, Sun, ArrowLeft, Plus, Trash2, ImagePlus, CheckCircle2, Upload, UserRoundCheck, Globe2, MessageSquare, Star, CreditCard, Phone, Banknote, RefreshCw, SlidersHorizontal, Share2
 } from 'lucide-react';
+import { CurrencySwitch, RequisitesCard, WithdrawCard, formatMoney, convert, walletPost, type Currency, type Wallet as WalletData } from './wallet';
 import './style.css';
 import './design.css';
 
 type Tab = 'games' | 'market' | 'reviews' | 'gifts' | 'event' | 'profile' | 'admin';
 type Lang = 'EN' | 'RU';
-type Currency = 'RUB' | 'USD' | 'GRAM';
-const BANKS = ['Сбербанк', 'Т-Банк', 'Альфа-Банк', 'ВТБ', 'Райффайзенбанк', 'Газпромбанк', 'Открытие', 'Совкомбанк', 'Россельхозбанк', 'МКБ'];
 type Sort = 'featured' | 'low' | 'high' | 'cheap' | 'expensive';
 type HistoryItem = { id: string; kind: 'purchase' | 'operation'; title: string; link: string | null; opType: 'topup' | 'profit' | null; amount: number; createdAt: number };
 type Theme = 'light' | 'dark';
@@ -256,8 +255,9 @@ function App() {
   const [priceEdits, setPriceEdits] = useState<Record<string, string>>({});
   const [buyGift, setBuyGift] = useState<GiftItem | null>(null);
   const [batchReport, setBatchReport] = useState('');
-  const [wdMethod, setWdMethod] = useState<'card' | 'sbp' | 'ton'>('card');
   const [stats, setStats] = useState({ balance: 0, spent: 0, purchases: 0 });
+  const [wallet, setWallet] = useState<WalletData | null>(null);
+  const refreshWallet = useRef<() => void>(() => {});
   const [statsForm, setStatsForm] = useState({ telegramId: '', mode: 'add', balance: '', spent: '', purchases: '' });
   const [manager, setManager] = useState({ username: 'Mananger_Playerok', url: managerUrl });
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -278,11 +278,6 @@ function App() {
   const [sell, setSell] = useState<{ id: string; price: string } | null>(null);
   const [ugForm, setUgForm] = useState({ telegramId: '', links: '' });
   const [ugList, setUgList] = useState<MyGift[]>([]);
-  const [wd, setWd] = useState({ bank: 'Сбербанк', custom: '', req: '', amount: '', cur: 'RUB' as Currency, result: 'idle' as 'idle' | 'ok' | 'low' });
-  const [currency, setCurrency] = useState<Currency>(() => { try { const c = localStorage.getItem('playerok.currency'); return c === 'USD' || c === 'GRAM' ? c : 'RUB'; } catch { return 'RUB'; } });
-  const [rates, setRates] = useState<{ usd: number; gram: number } | null>(null);
-  const [reqForm, setReqForm] = useState({ rubType: '', rubCard: '', rubPhone: '', rubBank: '', tonWallet: '' });
-  const [bankCustom, setBankCustom] = useState(false);
   const [toast, setToast] = useState('');
   const [giftForm, setGiftForm] = useState({
     collection: '', number: '', model: '', modelRarity: '', backdrop: '', backdropRarity: '',
@@ -465,15 +460,6 @@ function App() {
     try { await adminPost('/api/history', { action: 'delete', id }); setAdminHist(old => old.filter(h => h.id !== id)); }
     catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
   };
-  const submitWithdraw = () => {
-    const amount = Number(wd.amount.replace(',', '.'));
-    const digits = wd.req.replace(/[\s()-]/g, '');
-    const reqOk = wdMethod === 'card' ? /^\d{16,19}$/.test(digits) : wdMethod === 'sbp' ? /^\+?\d{10,15}$/.test(digits) : /^[A-Za-z0-9_:-]{20,128}$/.test(wd.req.trim());
-    if (!(amount > 0) || !reqOk) { showToast(lang === 'RU' ? 'Проверьте реквизиты и сумму' : 'Check the details and amount'); return; }
-    const rub = toRub(amount, wd.cur);
-    if (!Number.isFinite(rub)) { showToast(lang === 'RU' ? 'Курс сейчас недоступен' : 'Rate is unavailable'); return; }
-    setWd(old => ({ ...old, result: rub > stats.balance + 1e-9 ? 'low' : 'ok' }));
-  };
   const savePrice = async (id: string) => {
     if (!isAdmin) { showToast(t.adminDenied); return; }
     try {
@@ -484,7 +470,7 @@ function App() {
     } catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
   };
   const shareGift = (g: GiftItem) => {
-    const text = `${g.collection} #${g.number}${g.price != null ? ` — ${money(g.price)}` : ''}`;
+    const text = `${g.collection} #${g.number}${g.price != null ? ` — ${fmt(g.price)} ₽` : ''}`;
     openGift(`https://t.me/share/url?url=${encodeURIComponent(`${botUrl}?start=g_${g.id}`)}&text=${encodeURIComponent(text)}`);
   };
   const findUser = async () => {
@@ -673,51 +659,6 @@ function App() {
     if (tab !== 'admin' || !isAdmin) return;
     adminPost<Record<string, number>>('/api/admin-stats', { action: 'summary' }).then(setSummary).catch(() => {});
   }, [tab, isAdmin]);
-  // Курсы валют (GRAM = Toncoin), валюта и реквизиты, общие с ботом.
-  const applyProfile = (p: { currency?: string; rubType?: string; rubCard?: string; rubPhone?: string; rubBank?: string; tonWallet?: string }) => {
-    const next = { rubType: p.rubType || '', rubCard: p.rubCard || '', rubPhone: p.rubPhone || '', rubBank: p.rubBank || '', tonWallet: p.tonWallet || '' };
-    setReqForm(next); setBankCustom(!!next.rubBank && !BANKS.includes(next.rubBank));
-  };
-  useEffect(() => {
-    let active = true;
-    const loadRates = () => fetch('/api/rates').then(r => r.ok ? r.json() : null).then(d => { if (active && d?.usd > 0 && d?.gram > 0) setRates({ usd: d.usd, gram: d.gram }); }).catch(() => {});
-    void loadRates();
-    const timer = window.setInterval(loadRates, 300000);
-    if (window.Telegram?.WebApp?.initData) {
-      userPost<{ currency: string; rubType: string; rubCard: string; rubPhone: string; rubBank: string; tonWallet: string }>('/api/profile', { action: 'me' })
-        .then(p => { if (!active) return; if (p.currency === 'USD' || p.currency === 'GRAM' || p.currency === 'RUB') { setCurrency(p.currency); setWd(o => ({ ...o, cur: p.currency as Currency })); } applyProfile(p); }).catch(() => {});
-    }
-    return () => { active = false; window.clearInterval(timer); };
-  }, [telegramUser?.id]);
-  const rateOf = (c: Currency) => c === 'USD' ? rates?.usd : c === 'GRAM' ? rates?.gram : 1;
-  const toRub = (amount: number, c: Currency) => { const r = rateOf(c); return r ? amount * r : NaN; };
-  const fmtCur = (amount: number, c: Currency) => {
-    const locale = lang === 'RU' ? 'ru-RU' : 'en-US';
-    if (c === 'USD') return `$${new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)}`;
-    if (c === 'GRAM') return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(amount)} GRAM`;
-    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(amount)} ₽`;
-  };
-  // Все суммы хранятся в рублях; показываем в выбранной валюте по курсу.
-  const money = (rub: number) => { const r = rateOf(currency); return currency === 'RUB' || !r ? fmtCur(rub, 'RUB') : fmtCur(rub / r, currency); };
-  const changeCurrency = (c: Currency) => {
-    setCurrency(c); setWd(o => ({ ...o, cur: c, result: 'idle' }));
-    try { localStorage.setItem('playerok.currency', c); } catch { /* ignore */ }
-    if (window.Telegram?.WebApp?.initData) userPost('/api/profile', { action: 'save', currency: c }).catch(() => {});
-  };
-  const saveReq = async (patch?: Partial<typeof reqForm>) => {
-    const body = { ...reqForm, ...patch };
-    try { const p = await userPost<Parameters<typeof applyProfile>[0]>('/api/profile', { action: 'save', ...body }); applyProfile(p); showToast(lang === 'RU' ? 'Реквизиты сохранены' : 'Details saved'); }
-    catch (error) { showToast(error instanceof Error ? error.message : 'Error'); }
-  };
-  useEffect(() => {
-    const rb = reqForm.rubBank;
-    setWd(o => ({ ...o, req: wdMethod === 'card' ? reqForm.rubCard : wdMethod === 'sbp' ? reqForm.rubPhone : reqForm.tonWallet,
-      bank: !rb ? o.bank : BANKS.includes(rb) ? rb : '__custom', custom: rb && !BANKS.includes(rb) ? rb : o.custom, result: 'idle' }));
-  }, [wdMethod, reqForm]);
-  const saveWdReq = () => {
-    const bank = wd.bank === '__custom' ? wd.custom.trim() : wd.bank;
-    void saveReq(wdMethod === 'card' ? { rubCard: wd.req, rubBank: bank } : wdMethod === 'sbp' ? { rubPhone: wd.req, rubType: 'phone', rubBank: bank } : { tonWallet: wd.req });
-  };
   // История покупок/операций и актуальный юзернейм менеджера.
   useEffect(() => {
     let active = true;
@@ -736,12 +677,19 @@ function App() {
   const dt = (ms: number) => new Date(ms).toLocaleString(lang === 'RU' ? 'ru-RU' : 'en-US', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
   const opLabel = (type: string | null) => type === 'profit' ? (lang === 'RU' ? 'Прибыль с продаж' : 'Sales profit') : (lang === 'RU' ? 'Пополнение через менеджера' : 'Top-up via manager');
   const fmt = (n: number) => new Intl.NumberFormat(lang === 'RU' ? 'ru-RU' : 'en-US', { maximumFractionDigits: 2 }).format(n);
+  const currency: Currency = wallet?.currency ?? 'RUB';
+  const money = (rub: number) => formatMoney(rub, currency, wallet?.rates, lang);
+  const changeCurrency = (c: Currency) => {
+    setWallet(w => w ? { ...w, currency: c } : w);
+    walletPost('set_currency', { currency: c }).catch(e => { showToast(e instanceof Error ? e.message : 'Error'); refreshWallet.current(); });
+  };
   useEffect(() => {
     const initData = window.Telegram?.WebApp?.initData;
     if (!initData) return;
     let active = true;
-    const load = () => fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'me', initData }) })
-      .then(r => r.ok ? r.json() : null).then(d => { if (active && d) setStats({ balance: Number(d.balance) || 0, spent: Number(d.spent) || 0, purchases: Number(d.purchases) || 0 }); }).catch(() => {});
+    const load = () => walletPost<WalletData>('get')
+      .then(d => { if (active && d) { setWallet(d); setStats({ balance: Number(d.stats.balance) || 0, spent: Number(d.stats.spent) || 0, purchases: Number(d.stats.purchases) || 0 }); } }).catch(() => {});
+    refreshWallet.current = () => { void load(); };
     void load();
     const timer = window.setInterval(load, 20000);
     window.addEventListener('focus', load);
@@ -937,51 +885,23 @@ function App() {
               <div className="user-data"><h2>{fullName || telegramUser.username || `ID ${telegramUser.id}`}</h2><b>{telegramUser.username ? `@${telegramUser.username}` : (lang === 'EN' ? 'Username not set' : 'Имя пользователя не задано')}</b><small>TELEGRAM ID&nbsp; {telegramUser.id}</small></div>
             </div>
             <div className="profile-stats">
-              <div><small>{t.balance}</small><b>{money(stats.balance)}</b></div><div><small>{t.spent}</small><b>{money(stats.spent)}</b></div>
+              <div><small>{t.balance}</small><b>{money(stats.balance)}</b>{currency !== 'RUB' && convert(stats.balance, currency, wallet?.rates) !== null && <small className="rub-eq">≈ {fmt(stats.balance)} ₽</small>}</div><div><small>{t.spent}</small><b>{money(stats.spent)}</b></div>
               <div><small>{t.purchases}</small><b>{fmt(stats.purchases)}</b></div>
               <div className="language-stat"><small>{t.language}</small><button onClick={() => setLang(lang === 'EN' ? 'RU' : 'EN')}>{lang}<ChevronDown size={15}/></button></div>
             </div>
+            <CurrencySwitch value={currency} rates={wallet?.rates} lang={lang} onChange={changeCurrency}/>
             {telegramUser.is_premium && <div className="premium-chip"><Gem size={14}/>{t.premium}</div>}
           </> : <div className="telegram-connect">
             <div className="connect-icon"><UserRoundCheck size={26}/></div><h3>{t.notConnected}</h3><p>{t.telegramConnect}</p><a className="primary-btn connect-button" href={botUrl} target="_blank" rel="noreferrer">{t.connect} <ExternalLink size={14}/></a>
           </div>}
-          <div className="cur-card"><small>{lang === 'RU' ? 'Валюта' : 'Currency'}</small><div className="chips">{(['RUB', 'USD', 'GRAM'] as Currency[]).map(c => <button key={c} type="button" className={currency === c ? 'on' : ''} onClick={() => changeCurrency(c)}>{c === 'RUB' ? '₽ RUB' : c === 'USD' ? '$ USD' : 'GRAM'}</button>)}</div>{rates && <p className="cur-rate">1 USD = {fmt(rates.usd)} ₽ · 1 GRAM = {fmt(rates.gram)} ₽</p>}</div>
-          <div className="req-card">
-            <h3>{lang === 'RU' ? 'Реквизиты' : 'Payout details'}</h3>
-            <p className="cur-rate">{lang === 'RU' ? 'Общие для бота и сайта: сохраните один раз.' : 'Shared by the bot and the app: save once.'}</p>
-            <label>{lang === 'RU' ? 'Банковская карта' : 'Bank card'}<input inputMode="numeric" value={reqForm.rubCard} onChange={e => setReqForm(o => ({ ...o, rubCard: e.target.value }))} placeholder="2200 0000 0000 0000"/></label>
-            <label>{lang === 'RU' ? 'Номер телефона (СБП)' : 'Phone number (SBP)'}<input inputMode="tel" value={reqForm.rubPhone} onChange={e => setReqForm(o => ({ ...o, rubPhone: e.target.value }))} placeholder="+7 900 000-00-00"/></label>
-            <label>{lang === 'RU' ? 'Банк' : 'Bank'}<select value={bankCustom ? '__custom' : reqForm.rubBank} onChange={e => { if (e.target.value === '__custom') { setBankCustom(true); setReqForm(o => ({ ...o, rubBank: BANKS.includes(o.rubBank) ? '' : o.rubBank })); } else { setBankCustom(false); setReqForm(o => ({ ...o, rubBank: e.target.value })); } }}><option value="">—</option>{BANKS.map(b => <option key={b} value={b}>{b}</option>)}<option value="__custom">{lang === 'RU' ? 'Другой банк…' : 'Other bank…'}</option></select></label>
-            {bankCustom && <label>{lang === 'RU' ? 'Название банка' : 'Bank name'}<input maxLength={40} value={reqForm.rubBank} onChange={e => setReqForm(o => ({ ...o, rubBank: e.target.value }))}/></label>}
-            <label>{lang === 'RU' ? 'TON-адрес (GRAM)' : 'TON address (GRAM)'}<input value={reqForm.tonWallet} onChange={e => setReqForm(o => ({ ...o, tonWallet: e.target.value.trim() }))} placeholder="UQ…"/></label>
-            <button type="button" className="primary-btn" onClick={() => saveReq()}>{lang === 'RU' ? 'Сохранить реквизиты' : 'Save details'}</button>
-          </div>
           <div className="fx-card">
             <label className="fx-row"><span>{lang === 'RU' ? 'Вибрация' : 'Haptics'}</span><input type="checkbox" checked={fx.haptics} onChange={e => setFx(o => ({ ...o, haptics: e.target.checked }))}/><i/></label>
             <label className="fx-row"><span>{lang === 'RU' ? 'Звуки' : 'Sounds'}</span><input type="checkbox" checked={fx.sounds} onChange={e => setFx(o => ({ ...o, sounds: e.target.checked }))}/><i/></label>
           </div>
           <div className="hist"><h3>{lang === 'RU' ? 'История покупок' : 'Purchase history'}</h3>{history.some(h => h.kind === 'purchase') ? <ul className="hist-list">{history.filter(h => h.kind === 'purchase').map(h => <li key={h.id}><button type="button" className="hist-row" onClick={() => h.link && openGift(h.link)}><span className="hist-ico"><Gift size={16}/></span><span className="hist-main"><b>{h.title}</b><small>{dt(h.createdAt)}</small></span><span className="hist-amt">{money(h.amount)}</span></button></li>)}</ul> : <p>{lang === 'RU' ? 'Покупок пока нет.' : 'No purchases yet.'}</p>}</div>
           <div className="hist"><h3>{lang === 'RU' ? 'История операций' : 'Transaction history'}</h3>{history.some(h => h.kind === 'operation') ? <ul className="hist-list">{history.filter(h => h.kind === 'operation').map(h => <li key={h.id}><div className="hist-row"><span className={h.opType === 'profit' ? 'hist-ico profit' : 'hist-ico'}>{h.opType === 'profit' ? <TrendingUp size={16}/> : <Wallet size={16}/>}</span><span className="hist-main"><b>{opLabel(h.opType)}</b><small>{dt(h.createdAt)}</small></span><span className="hist-amt plus">+{money(h.amount)}</span></div></li>)}</ul> : <p>{lang === 'RU' ? 'Операций пока нет.' : 'No transactions yet.'}</p>}</div>
-          <div className="wd-card">
-            <div className="wd-head"><div><span className="wd-kicker">{lang === 'RU' ? 'ВЫВОД СРЕДСТВ' : 'WITHDRAWAL'}</span><h3>{lang === 'RU' ? 'Вывести средства' : 'Withdraw funds'}</h3><small>{lang === 'RU' ? 'Обработка до 48 часов' : 'Processed within 48 hours'}</small></div><div className="wd-icon"><Banknote size={20}/></div></div>
-            <div className="wd-tabs three">
-              <button type="button" className={wdMethod === 'card' ? 'on' : ''} onClick={() => setWdMethod('card')}><CreditCard size={14}/>{lang === 'RU' ? 'Карта' : 'Card'}</button>
-              <button type="button" className={wdMethod === 'sbp' ? 'on' : ''} onClick={() => setWdMethod('sbp')}><Phone size={14}/>{lang === 'RU' ? 'СБП' : 'SBP'}</button>
-              <button type="button" className={wdMethod === 'ton' ? 'on' : ''} onClick={() => setWdMethod('ton')}><Gem size={14}/>TON</button>
-            </div>
-            {wdMethod !== 'ton' && <select className="wd-field" value={wd.bank} onChange={e => setWd(o => ({ ...o, bank: e.target.value }))}>{BANKS.map(b => <option key={b} value={b}>{b}</option>)}<option value="__custom">{lang === 'RU' ? 'Другой банк…' : 'Other bank…'}</option></select>}
-            {wdMethod !== 'ton' && wd.bank === '__custom' && <input className="wd-field" maxLength={40} value={wd.custom} onChange={e => setWd(o => ({ ...o, custom: e.target.value }))} placeholder={lang === 'RU' ? 'Название банка' : 'Bank name'}/>}
-            <input className="wd-field" inputMode={wdMethod === 'ton' ? 'text' : 'numeric'} value={wd.req} onChange={e => setWd(o => ({ ...o, req: e.target.value, result: 'idle' }))} placeholder={wdMethod === 'card' ? (lang === 'RU' ? 'Номер карты' : 'Card number') : wdMethod === 'sbp' ? (lang === 'RU' ? 'Номер телефона для СБП' : 'Phone number for SBP') : (lang === 'RU' ? 'Адрес TON-кошелька' : 'TON wallet address')}/>
-            <div className="chips wd-cur">{(['RUB', 'USD', 'GRAM'] as Currency[]).map(c => <button type="button" key={c} className={wd.cur === c ? 'on' : ''} onClick={() => setWd(o => ({ ...o, cur: c, amount: '', result: 'idle' }))}>{c === 'RUB' ? '₽ RUB' : c === 'USD' ? '$ USD' : 'GRAM'}</button>)}</div>
-            <div className="wd-row"><input className="wd-field" type="number" inputMode="decimal" min="0" value={wd.amount} onChange={e => setWd(o => ({ ...o, amount: e.target.value, result: 'idle' }))} placeholder={lang === 'RU' ? 'Сумма' : 'Amount'}/><button type="button" className="wd-all" onClick={() => { const r = rateOf(wd.cur); if (r) { const d = wd.cur === 'GRAM' ? 1000 : 100; setWd(o => ({ ...o, amount: String(Math.floor(stats.balance / r * d) / d), result: 'idle' })); } }}>{lang === 'RU' ? 'ВСЁ' : 'MAX'}</button></div>
-            <div className="wd-receive"><div><small>{lang === 'RU' ? 'ВЫ ПОЛУЧИТЕ' : 'YOU RECEIVE'}</small><b>{fmtCur(Number(wd.amount.replace(',', '.')) || 0, wd.cur)}</b></div><span className="wd-refresh"><RefreshCw size={16}/></span></div>
-            {rates && wd.cur !== 'RUB' && <p className="wd-note">1 {wd.cur} = {fmt(wd.cur === 'USD' ? rates.usd : rates.gram)} ₽</p>}
-            <button type="button" className="admin-ghost" onClick={saveWdReq}>{lang === 'RU' ? 'Сохранить в реквизиты' : 'Save to my details'}</button>
-            <button type="button" className="wd-submit" onClick={submitWithdraw}><Banknote size={16}/>{lang === 'RU' ? 'Вывести' : 'Withdraw'}</button>
-            {wd.result === 'low' && <div className="wd-result low">{lang === 'RU' ? `Недостаточно средств на балансе. Ваш баланс: ${money(stats.balance)}.` : `Insufficient balance. Your balance: ${money(stats.balance)}.`}</div>}
-            {wd.result === 'ok' && <div className="wd-result ok">{lang === 'RU' ? 'Вывод будет выполнен в течение 48 часов. Для оформления обратитесь к менеджеру: ' : 'Your withdrawal will be completed within 48 hours. To proceed, contact the manager: '}<a href={manager.url} target="_blank" rel="noreferrer">@{manager.username}</a></div>}
-            <p className="wd-note">{lang === 'RU' ? 'Вывод обрабатывается до 48 часов после обращения к менеджеру. Выплата по курсу CoinGecko.' : 'Withdrawals are processed within 48 hours after contacting the manager. Payout at the CoinGecko rate.'}</p>
-          </div>
+          <WithdrawCard wallet={wallet} lang={lang} manager={manager} toast={showToast} onDone={() => refreshWallet.current()}/>
+          <RequisitesCard wallet={wallet} lang={lang} toast={showToast} onSaved={r => setWallet(w => w ? { ...w, requisites: r } : w)}/>
           <a className="bot-card-link" href={botUrl} target="_blank" rel="noreferrer"><span className="bot-avatar"><ShieldCheck size={19}/></span><span><b>@Playerok_Guarantor_Bot</b><small>{t.bot}</small></span><ExternalLink size={15}/></a>
         </div>
       </section>}

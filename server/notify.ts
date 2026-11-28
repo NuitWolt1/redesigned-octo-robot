@@ -16,3 +16,13 @@ export function adminChats(): string[] {
   return custom.length ? custom : [...ADMIN_IDS];
 }
 export const notifyAdmins = (text: string) => Promise.all(adminChats().map(id => notify(id, text))).then(() => undefined);
+
+export type InlineButton = { text: string; callback_data: string };
+export async function notifyWithButtons(chatId: string | number, text: string, buttons: InlineButton[][]): Promise<void> {
+  const token = process.env.BOT_TOKEN;
+  if (!token) return;
+  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(6000),
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true, reply_markup: { inline_keyboard: buttons } })
+  }).catch(() => undefined);
+}

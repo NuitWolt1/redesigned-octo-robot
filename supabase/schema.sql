@@ -146,3 +146,65 @@ alter table public.user_profile enable row level security;
 revoke all on table public.user_profile from anon, authenticated;
 grant select, insert, update, delete on table public.user_profile to service_role;
 notify pgrst, 'reload schema';
+
+-- ===== Withdrawals with frozen funds =====
+alter table public.user_stats add column if not exists frozen numeric(14,2) not null default 0 check (frozen >= 0);
+alter table public.user_profile add column if not exists rub_card_bank text;
+alter table public.user_profile add column if not exists language text check (language in ('RU', 'EN', 'ZH', 'AR'));
+
+create table if not exists public.withdrawals (
+  id uuid primary key default gen_random_uuid(),
+  telegram_id text not null check (telegram_id ~ '^[0-9]{1,15}$'),
+  method text not null check (method in ('card', 'sbp', 'ton')),
+  currency text not null check (currency in ('RUB', 'GRAM', 'USDT')),
+  amount numeric(18,6) not null check (amount > 0),
+  amount_rub numeric(14,2) not null check (amount_rub > 0),
+  details text not null,
+  bank text,
+  status text not null default 'pending' check (status in ('pending', 'paid', 'rejected')),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+create index if not exists withdrawals_user_idx on public.withdrawals (telegram_id, created_at desc);
+create index if not exists withdrawals_pending_idx on public.withdrawals (status, created_at);
+alter table public.withdrawals enable row level security;
+revoke all on table public.withdrawals from anon, authenticated;
+grant select, insert, update, delete on table public.withdrawals to service_role;
+
+-- Atomically moves money from balance to frozen and records the request.
+create or replace function public.create_withdrawal(
+  p_telegram_id text, p_method text, p_currency text, p_amount numeric, p_amount_rub numeric, p_details text, p_bank text
+) returns public.withdrawals language plpgsql as $$
+declare w public.withdrawals;
+begin
+  update public.user_stats
+     set balance = balance - p_amount_rub, frozen = frozen + p_amount_rub, updated_at = now()
+   where telegram_id = p_telegram_id and balance >= p_amount_rub;
+  if not found then raise exception 'insufficient_funds'; end if;
+  insert into public.withdrawals (telegram_id, method, currency, amount, amount_rub, details, bank)
+  values (p_telegram_id, p_method, p_currency, p_amount, p_amount_rub, p_details, p_bank)
+  returning * into w;
+  return w;
+end $$;
+
+-- paid: frozen money is gone; rejected: frozen money returns to balance.
+create or replace function public.resolve_withdrawal(p_id uuid, p_status text)
+returns public.withdrawals language plpgsql as $$
+declare w public.withdrawals;
+begin
+  select * into w from public.withdrawals where id = p_id for update;
+  if not found then raise exception 'not_found'; end if;
+  if w.status <> 'pending' then raise exception 'already_resolved'; end if;
+  if p_status = 'paid' then
+    update public.user_stats set frozen = greatest(frozen - w.amount_rub, 0), updated_at = now() where telegram_id = w.telegram_id;
+  elsif p_status = 'rejected' then
+    update public.user_stats set frozen = greatest(frozen - w.amount_rub, 0), balance = balance + w.amount_rub, updated_at = now() where telegram_id = w.telegram_id;
+  else raise exception 'bad_status'; end if;
+  update public.withdrawals set status = p_status, resolved_at = now() where id = p_id returning * into w;
+  return w;
+end $$;
+revoke all on function public.create_withdrawal(text, text, text, numeric, numeric, text, text) from public, anon, authenticated;
+revoke all on function public.resolve_withdrawal(uuid, text) from public, anon, authenticated;
+grant execute on function public.create_withdrawal(text, text, text, numeric, numeric, text, text) to service_role;
+grant execute on function public.resolve_withdrawal(uuid, text) to service_role;
+notify pgrst, 'reload schema';

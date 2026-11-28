@@ -37,8 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!isBotRequest(req.headers['x-bot-auth'])) return res.status(403).json({ error: 'Bot access required.' });
       const id = String(body.telegramId ?? '').trim();
       if (!/^[0-9]{1,15}$/.test(id)) return res.status(400).json({ error: 'Invalid Telegram ID.' });
-      const row = (await find(id))[0];
-      return res.status(200).json({ ...toStats(row), exists: Boolean(row) });
+      return res.status(200).json(toStats((await find(id))[0]));
     }
 
     if (body.action !== 'adjust') return res.status(400).json({ error: 'Unknown action.' });
@@ -63,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const query = new URLSearchParams({ select: '*', on_conflict: 'telegram_id' });
     const rows = await databaseRequest<StatsRow[]>('user_stats', query, 'POST', { telegram_id: telegramId, ...next, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=representation');
     const saved = toStats(rows[0]);
-    if (!body.silent) await notify(telegramId, `${emo('✅')} Профиль обновлён\nБаланс: <b>${saved.balance} ₽</b> · Потрачено: <b>${saved.spent} ₽</b> · Покупок: <b>${saved.purchases}</b>`);
+    await notify(telegramId, `${emo('✅')} Профиль обновлён\nБаланс: <b>${saved.balance} ₽</b> · Потрачено: <b>${saved.spent} ₽</b> · Покупок: <b>${saved.purchases}</b>`);
     return res.status(200).json(saved);
   } catch (error) {
     console.error('Stats API error:', error);

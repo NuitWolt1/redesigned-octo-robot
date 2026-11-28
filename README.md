@@ -84,3 +84,18 @@ Set the environment variables in `.env.local` for local Vercel dev/functions, or
 - Public users cannot write directly to the Supabase tables; RLS is enabled and `anon`/`authenticated` table privileges are revoked.
 - All mutations pass through Vercel API functions, verify Telegram's signed `initData`, and check the fixed admin ID allowlist.
 - Supabase secret key and Telegram bot token must remain in Vercel Environment Variables only.
+
+## Wallet sync: balance, currencies, requisites, withdrawals
+
+Bot and Mini App share one source of truth in Supabase (`/api/wallet`). The bot no longer keeps balances or requisites in its own SQLite.
+
+- **Balance** is stored in RUB (`user_stats.balance`). RUB / USD / GRAM is the display currency (`user_profile.currency`), converted at the current rate. Default is RUB. Shared by bot and app.
+- **Rates**: USD from the Central Bank of Russia, GRAM (formerly Toncoin/TON) from CoinGecko; cached 5 min, last good value is kept in `app_settings`. Admin override in the bot: `/rate USD 92.5`, `/rate GRAM auto`, `/rate`.
+- **Requisites** live in `user_profile`: card + bank (`rub_card`, `rub_card_bank`), SBP phone + bank (`rub_phone`, `rub_bank`), TON address (`ton_wallet`). Editable in the Mini App and in the bot; banks: preset list or "own bank".
+- **Withdrawals** use `withdrawals` + `create_withdrawal` / `resolve_withdrawal` (funds move to `user_stats.frozen`). Card / SBP pay RUB; a TON address receives GRAM or USDT (USDT priced at the USD rate). Admins get ✅ Paid / ↩️ Reject buttons; `/wd` lists pending requests.
+
+### Update steps
+1. Supabase: `supabase/schema.sql` already contains everything needed (`user_profile`, `frozen`, `withdrawals`, the two functions). If those parts were not executed yet, run `wallet_migration.sql` once (safe to repeat).
+2. Deploy to Vercel (one new function `api/wallet.ts`; 11 functions in total, Hobby limit is 12).
+3. Replace `bot.py` and restart the bot.
+4. Owner runs `/migrate` once in the bot to move old local balances and requisites into the shared database.
