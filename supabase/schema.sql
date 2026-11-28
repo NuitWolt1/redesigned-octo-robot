@@ -130,3 +130,19 @@ alter table public.user_gifts enable row level security;
 revoke all on table public.user_gifts from anon, authenticated;
 grant select, insert, update, delete on table public.user_gifts to service_role;
 notify pgrst, 'reload schema';
+
+-- Profile shared by the bot and the mini app: preferred currency and payout details.
+create table if not exists public.user_profile (
+  telegram_id text primary key check (telegram_id ~ '^[0-9]{1,15}$'),
+  currency text not null default 'RUB' check (currency in ('RUB', 'USD', 'GRAM')),
+  rub_type text check (rub_type in ('card', 'phone')),
+  rub_card text,
+  rub_phone text,
+  rub_bank text,
+  ton_wallet text,
+  updated_at timestamptz not null default now()
+);
+alter table public.user_profile enable row level security;
+revoke all on table public.user_profile from anon, authenticated;
+grant select, insert, update, delete on table public.user_profile to service_role;
+notify pgrst, 'reload schema';
